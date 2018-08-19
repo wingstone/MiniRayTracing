@@ -1,0 +1,52 @@
+//区分大小写
+Material{
+	DiffuseMaterial{	//0
+		RefType:DIFFUSE;Emmision:10,10,10;Color:1,1,1;	//light
+	}
+	DiffuseMaterial{	//1
+		RefType:DIFFUSE;Emmision:0,0,0;Color:1,0,0;			//Red
+	}
+	DiffuseMaterial{	//2
+		RefType:DIFFUSE;Emmision:0,0,0;Color:0,1,0;			//Green
+	}
+	DiffuseMaterial{	//3
+		RefType:DIFFUSE;Emmision:0,0,0;Color:1,1,1;			//White
+	}
+	ReflectMaterial{	//4
+		RefType:MIRROR;			//Mirror
+	}
+	TranspMaterial{	//5
+		RefType:TRANSP; Fresnal:0.04; ReftIndex:1.5;		//Glass
+	}
+}
+Model{
+	Plane{	//0 wallFront
+		Center:0,0,5; Normal:0,0,-1; Material: 3;
+	}
+	Box{	//2 wallLeft
+		MinPosition:-5.25,-5.25,-5.25; MaxPosition:-5,5,5; Material: 1;
+	}
+	Box{	//3 wallRight
+		MinPosition:5,-5.25,-5.25; MaxPosition:5.25,-5.25,-5.25; Material: 2;
+	}
+	Box{	//4 wallBottom
+		MinPosition:-5.25,-5.25,-5.25; MaxPosition:5.25,-5,5.25; Material: 3;
+	}
+	Box{	//5 wallTop
+		MinPosition:-5.25,5,-5.25; MaxPosition:5.25,5.25,5.25; Material: 3;
+	}
+	Box{	//6 light
+		MinPosition:-1,4.75,-1; MaxPosition:1,5.25,1; Material: 0;
+	}
+	Sphere{	//7	glass
+		Center:-2,-2,-1; Redius:2; Material: 4;
+	}
+	Sphere{	//8	mirror
+		Center:2.5,-2,2; Redius:2; Material: 5;
+	}
+}
+Camera{
+	PerspectiveCamera{
+		Fov:60; Aspect:1.0; Point:0,0,13; Front:0,0,-1; Up:0,1,0;
+	}
+}

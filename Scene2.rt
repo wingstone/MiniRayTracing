@@ -1,0 +1,123 @@
+//区分大小写 右手坐标系
+Material{
+	DiffuseMaterial{	//0
+		RefType:DIFFUSE; Emmision:7,7,7; Color:1,1,1;	//light
+	}
+	DiffuseMaterial{	//1
+		RefType:DIFFUSE; Emmision:0,0,0; Color:0,0,0;			//black
+	}
+	CookMaterial{	//2
+		RefType:COOK; Emmision:0.2,0.2,0.2; Color:1.0,1.0,1.0; Fresnal:0.9; Roughness:1.0			//microsurface
+	}
+	CookMaterial{	//3
+		RefType:COOK; Emmision:0.2,0.2,0.2; Color:1.0,1.0,1.0; Fresnal:0.9; Roughness:0.7			//microsurface
+	}
+	CookMaterial{	//4
+		RefType:COOK; Emmision:0.2,0.2,0.2; Color:1.0,1.0,1.0; Fresnal:0.9; Roughness:0.3			//microsurface
+	}
+	CookMaterial{	//5
+		RefType:COOK; Emmision:0.2,0.2,0.2; Color:1.0,1.0,1.0; Fresnal:0.9; Roughness:0.1			//microsurface
+	}
+}
+Model{
+	Polygon{	//0 wallBottom
+		Point:-14,0,21; Point:14,0,21; Point:14,0,0; Point:-14,0,0; Material:1;
+	}
+	Polygon{	//1 wallFront
+		Point:-14,0,0; Point:14,0,0; Point:14,15,0; Point:-14,15,0; Material:1;
+	}
+	
+	Polygon{	//2 Rectangle0
+		Point:-4.018,2.482,2.658; Point:7.857,2.51,2.645; Point:7.854,3.38,1.674; Point:-4.021,3.353,1.687; Material:2;
+	}
+	Polygon{
+		Point:-4.021,3.265,1.609; Point:-4.018,2.395,2.579; Point:-4.018,2.482,2.658; Point:-4.021,3.353,1.687; Material:2;
+	}
+	Polygon{
+		Point:-4.018,2.395,2.579; Point:7.857,2.423,2.566; Point:7.857,2.51,2.645; Point:-4.018,2.482,2.658; Material:2;
+	}
+	Polygon{
+		Point:7.857,2.51,-2.645; Point:7.857,2.423,2.566; Point:7.854,3.293,1.596; Point:7.854,3.38,1.674; Material:2;
+	}
+	Polygon{
+		Point:7.854,3.38,1.674; Point:7.854,3.293,1.596; Point:-4.021,3.265,1.609; Point:-4.021,3.353,1.687; Material:2;
+	}
+	Polygon{
+		Point:7.857,2.423,2.566; Point:-4.018,2.395,2.579; Point:-4.021,3.265,1.609; Point:7.854,3.293,1.596; Material:2;
+	}
+	
+	Polygon{	//3 Rectangle1
+		Point:-4.02,2.436,3.23; Point:-4.02,1.813,4.375; Point:7.856,1.813,4.375; Point:7.856,2.436,3.23; Material:3;
+	}
+	Polygon{
+		Point:-4.02,1.709,4.319; Point:7.856,1.709,4.319; Point:7.856,1.813,4.375; Point:-4.02,1.813,4.375; Material:3;
+	}
+	Polygon{
+		Point:-4.02,2.436,3.23; Point:-4.02,2.333,3.174; Point:4.02,1.709,4.319; Point:-4.02,1.813,4.375; Material:3;
+	}
+	Polygon{
+		Point:7.856,1.813,4.375; Point:7.856,1.709,4.319; Point:7.856,2.333,3.174; Point:7.856,2.436,3.23; Material:3;
+	}
+	Polygon{
+		Point:7.856,2.436,3.23; Point:7.856,2.333,3.174; Point:-4.02,2.333,3.174; Point:-4.02,2.436,3.23; Material:3;
+	}
+	Polygon{
+		Point:7.856,2.333,3.174; Point:7.856,1.709,4.319; Point:-4.02,1.709,4.319; Point:-4.02,2.333,3.174; Material:3;
+	}
+	
+	Polygon{	//4 Rectangle2
+		Point:-4.02,1.394,5.918; Point:-4.02,1.282,5.88; Point:7.856,1.282,5.88; Point:7.856,1.394,5.918; Material:4;
+	}
+	Polygon{
+		Point:-4.02,1.815,4.685; Point:-4.02,1.394,5.918; Point:7.856,1.394,5.918; Point:7.856,1.815,4.685; Material:4;
+	}
+	Polygon{
+		Point:-4.02,1.815,4.685; Point:-4.02,1.704,4.647; Point:-4.02,1.282,5.88; Point:-4.02,1.394,5.918; Material:4;
+	}
+	Polygon{
+		Point:7.856,1.394,5.918; Point:7.856,1.282,5.88; Point:7.856,1.704,4.647; Point:7.856,1.815,4.685; Material:4;
+	}
+	Polygon{
+		Point:7.856,1.815,4.685; Point:7.856,1.704,4.647; Point:-4.02,1.704,4.647; Point:-4.02,1.815,4.685; Material:4;
+	}
+	Polygon{
+		Point:7.856,1.704,4.647; Point:7.856,1.282,5.88; Point:-4.02,1.282,5.88; Point:-4.02,1.704,4.647; Material:4;
+	}
+	
+	Polygon{	//5 Rectangle3
+		Point:-4.02,0.896,7.343; Point:-4.02,0.782,7.315; Point:7.856,0.782,7.315; Point:7.856,0.896,7.343; Material:5;
+	}
+	Polygon{
+		Point:-4.02,1.209,6.078; Point:-4.02,0.896,7.343; Point:7.856,0.896,7.343; Point:7.856,1.209,6.078; Material:5;
+	}
+	Polygon{
+		Point:-4.02,1.209,6.078; Point:-4.02,1.095,6.05; Point:-4.02,0.782,7.315; Point:-4.02,0.896,7.343; Material:5;
+	}
+	Polygon{
+		Point:7.856,0.896,7.343; Point:7.856,0.782,7.315; Point:7.856,1.095,6.05; Point:7.856,1.209,6.078; Material:5;
+	}
+	Polygon{
+		Point:7.856,1.209,6.078; Point:7.856,1.095,6.05; Point:-4.02,1.095,6.05; Point:-4.02,1.209,6.078; Material:5;
+	}
+	Polygon{
+		Point:7.856,1.095,6.05; Point:7.856,0.782,7.315; Point:-4.02,0.782,7.315; Point:-4.02,1.095,6.05; Material:5;
+	}
+	
+	Sphere{	//6
+		Center:7.011,6.658,3.036; Redius:0.888; Material: 0;
+	}
+	Sphere{	//7
+		Center:3.634,6.658,3.036; Redius:0.6; Material: 0;
+	}
+	Sphere{	//8
+		Center:0,6.658,3.036; Redius:0.333; Material: 0;
+	}
+	Sphere{	//9
+		Center:-3.37,6.658,3.036; Redius:0.115; Material: 0;
+	}
+}
+Camera{
+	PerspectiveCamera{
+		Fov:60; Aspect:1.0; Point:1.8,5.5,13; Front:0,-0.2,-1; Up:0,1,-0.2;
+	}
+}
