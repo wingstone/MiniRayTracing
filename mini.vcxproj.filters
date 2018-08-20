@@ -13,29 +13,55 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="资源文件\SceneFile">
+      <UniqueIdentifier>{834d7df6-1653-4c9d-87ad-fb21dbaf4867}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="头文件\Head">
+      <UniqueIdentifier>{6ab498d4-008e-404c-a952-83c0f283d756}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="bmp.h">
-      <Filter>头文件</Filter>
+    <ClInclude Include="Head\bmp.h">
+      <Filter>头文件\Head</Filter>
     </ClInclude>
-    <ClInclude Include="Commen.h">
-      <Filter>头文件</Filter>
+    <ClInclude Include="Head\Commen.h">
+      <Filter>头文件\Head</Filter>
     </ClInclude>
-    <ClInclude Include="function.h">
-      <Filter>头文件</Filter>
+    <ClInclude Include="Head\Core.h">
+      <Filter>头文件\Head</Filter>
     </ClInclude>
-    <ClInclude Include="structure.h">
-      <Filter>头文件</Filter>
+    <ClInclude Include="Head\function.h">
+      <Filter>头文件\Head</Filter>
     </ClInclude>
-    <ClInclude Include="windowDecl.h">
-      <Filter>头文件</Filter>
+    <ClInclude Include="Head\RTFile.h">
+      <Filter>头文件\Head</Filter>
     </ClInclude>
-    <ClInclude Include="Core.h">
-      <Filter>头文件</Filter>
+    <ClInclude Include="Head\structure.h">
+      <Filter>头文件\Head</Filter>
+    </ClInclude>
+    <ClInclude Include="Head\windowDecl.h">
+      <Filter>头文件\Head</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Main.cpp">
+    <None Include="SceneFile\MyScene.rt">
+      <Filter>资源文件\SceneFile</Filter>
+    </None>
+    <None Include="SceneFile\Scene.rt">
+      <Filter>资源文件\SceneFile</Filter>
+    </None>
+    <None Include="SceneFile\Scene2.rt">
+      <Filter>资源文件\SceneFile</Filter>
+    </None>
+    <None Include="SceneFile\Scene3.rt">
+      <Filter>资源文件\SceneFile</Filter>
+    </None>
+    <None Include="ReadMe.md">
+      <Filter>资源文件</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Src\Main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

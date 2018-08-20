@@ -1,4 +1,4 @@
-#include "Commen.h"
+#include "../Head/Commen.h"
 #include <thread>
 #include <chrono> 
 #include <exception>
@@ -18,7 +18,7 @@ using namespace mini;
 //Ö÷º¯Êý
 int main(int argc, char* argv[])
 {
-	int spp = 1, depth = 2;
+	int spp = 4, depth = 4;
 #ifndef _DEBUG
 	if (argc != 2)
 	{
@@ -40,7 +40,7 @@ int main(int argc, char* argv[])
 #ifndef _DEBUG
 		scene->initFromFile(argv[1]);
 #else
-		scene->initFromFile("Scene2.rt");
+		scene->initFromFile("Scene_DepthField.rt");
 #endif // !_DEBUG
 		scene->renderAndWrite("RayTrace.bmp");
 		delete scene;

@@ -77,7 +77,7 @@ namespace mini{
 					{
 						stack = 0;
 						str = std::string();
-						str.reserve(1024);
+						str.reserve(2048);
 						while (filestream.get(c))
 						{
 							str.push_back(c);
@@ -92,7 +92,7 @@ namespace mini{
 					{
 						stack = 0;
 						str = std::string();
-						str.reserve(1024);
+						str.reserve(2048);
 						while (filestream.get(c))
 						{
 							str.push_back(c);
@@ -119,6 +119,34 @@ namespace mini{
 							fron = getNextVector(filestream);
 							up = getNextVector(filestream);
 							_camera = new PerspectiveCamera(fov, asp, po, fron, up );
+						}
+						else if (str.compare("OrthoCamera") == 0)
+						{
+							float height = getNextNumber(filestream);
+							float aspect = getNextNumber(filestream);
+							point origin = getNextVector(filestream);
+							vector<float> front = getNextVector(filestream);
+							vector<float> up = getNextVector(filestream);
+							_camera = new OrthoCamera(height, aspect, origin, front, up);
+						}
+						else if (str.compare("PinholeCamera") == 0)
+						{
+							float apertureRedius = getNextNumber(filestream);
+							float focusDistance = getNextNumber(filestream);	
+							float imageDistance = getNextNumber(filestream);
+							float height = getNextNumber(filestream);
+							float aspect = getNextNumber(filestream);
+							point origin = getNextVector(filestream);
+							vector<float> front = getNextVector(filestream);
+							vector<float> up = getNextVector(filestream);
+							_camera = new PinholeCamera(apertureRedius, focusDistance, imageDistance, height, aspect, origin, front, up);
+						}
+						else if (str.compare("EnviromentCamera") == 0)
+						{
+							point origin = getNextVector(filestream);
+							vector<float> front = getNextVector(filestream);
+							vector<float> up = getNextVector(filestream);
+							_camera = new EnviromentCamera(origin, front, up);
 						}
 					}
 				}
@@ -258,7 +286,6 @@ namespace mini{
 		}
 		void getMaterial(std::iostream& sstream)
 		{
-			char cstr[256];
 			std::string str;
 			while (true)
 			{
@@ -277,8 +304,6 @@ namespace mini{
 					color matCol;
 					matCol = getNextVector(sstream);
 					_materialList->push_back(new MirrorMaterial(MIRROR, matCol));
-					sstream.getline(cstr, 256);
-					sstream.getline(cstr, 256);
 				}
 				else if (str.compare("TranspMaterial") == 0)
 				{
@@ -401,12 +426,12 @@ namespace mini{
 					int sqrt_spp = std::round(std::sqrt(_samplePerPixel));
 					for (int s1 = 0; s1 < sqrt_spp; s1++)
 						for (int s2 = 0; s2 < sqrt_spp; s2++) {
-							r1 = RandNumber() ;
-							r2 = RandNumber() ;
-							r1 = ( (s1 + r1) / float(sqrt_spp) + i + x*sub_wid) / _width;
-							r2 = ( (s1 + r2) / float(sqrt_spp) + j + y*sub_hei) / _height;
+							r1 = (s1 + RandNumber()) / float(sqrt_spp);
+							r2 = (s2 + RandNumber())/ float(sqrt_spp);
+							float screenX = ( (s1 + r1) / float(sqrt_spp) + i + x*sub_wid) / _width;
+							float screenY = ( (s1 + r2) / float(sqrt_spp) + j + y*sub_hei) / _height;
 
-							Ray ray = _camera->getRay(r1, r2);
+							Ray ray = _camera->getRay(screenX, screenY, r1, r2);
 							col = col + rayTrace(ray, 0)*spp_1;
 						}
 

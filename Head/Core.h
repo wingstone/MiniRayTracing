@@ -517,15 +517,15 @@ namespace mini
 		Material* _material;
 	};
 
-	//Camera
+	//Camera; 原点为左下角
 	class Camera
 	{
 	public:
 		Camera(){};
 		virtual~Camera(){};
 
-		//x,y~(-1,1)
-		virtual Ray getRay(float x, float y) = 0;
+		//x,y~(0,1)	图片左下角为原点
+		virtual Ray getRay(float screenX, float screenY, float randx, float randy) = 0;
 	};
 
 	//Perspective Camera
@@ -541,9 +541,9 @@ namespace mini
 		~PerspectiveCamera(){}
 
 		//归一化屏幕坐标，范围：0~1
-		Ray getRay(float x, float y)
+		Ray getRay(float screenX, float screenY, float randx, float randy)
 		{
-			vector<float> dir = _up * std::tan(_fov / 2) *(y*2.0f-1.0f) + _right * std::tan(_fov / 2)*_aspect*(x*2.0f-1.0f) + _front;
+			vector<float> dir = _up * std::tan(_fov / 2) *(screenY*2.0f-1.0f) + _right * std::tan(_fov / 2)*_aspect*(screenX*2.0f-1.0f) + _front;		//射线从origin发射
 			dir = Normalize(dir);
 			return Ray(_origin, dir);
 		}
@@ -561,7 +561,8 @@ namespace mini
 	class OrthoCamera :public Camera
 	{
 	public:
-		OrthoCamera(float fov, float aspect, point origin, vector<float> front, vector<float> up) : _aspect(aspect), _fov(fov*PI / 180), _origin(origin)
+		OrthoCamera(float height, float aspect, point origin, vector<float> front, vector<float> up)
+			: _height(height), _aspect(aspect),  _origin(origin)
 		{
 			_right = Normalize(Cross(front, up));
 			_up = Normalize(Cross(_right, front));
@@ -570,15 +571,14 @@ namespace mini
 		~OrthoCamera() {}
 
 		//归一化屏幕坐标，范围：0~1
-		Ray getRay(float x, float y)
+		Ray getRay(float screenX, float screenY, float randx, float randy)
 		{
-			vector<float> dir = _up * std::tan(_fov / 2) *(y*2.0f - 1.0f) + _right * std::tan(_fov / 2)*_aspect*(x*2.0f - 1.0f) + _front;
-			dir = Normalize(dir);
-			return Ray(_origin, dir);
+			point origin = _origin + _right * (_aspect*(screenX*2.f - 1.f)) + _up * (screenY*2.f - 1.f);		//射线从像素发射
+			return Ray(origin, _front);
 		}
 
 	private:
-		float _fov;	//竖直方向上夹角
+		float _height;
 		float _aspect;		//width/height
 		point _origin;
 		vector<float> _front;
@@ -586,11 +586,12 @@ namespace mini
 		vector<float> _right;
 	};
 
-	//Pinhole Camera
+	//Pinhole Camera		//针对pinhole相机，不在从屏幕像素中采样，而直接从透镜中采样。
 	class PinholeCamera :public Camera
 	{
 	public:
-		PinholeCamera(float fov, float aspect, point origin, vector<float> front, vector<float> up) : _aspect(aspect), _fov(fov*PI / 180), _origin(origin)
+		PinholeCamera(float apertureRedius, float focusDistance, float imageDistance, float height, float aspect, point origin, vector<float> front, vector<float> up)
+			: _apertureRedius(apertureRedius), _focusDistance(focusDistance), _imageDistance(imageDistance), _height(height), _aspect(aspect), _origin(origin)
 		{
 			_right = Normalize(Cross(front, up));
 			_up = Normalize(Cross(_right, front));
@@ -598,17 +599,57 @@ namespace mini
 		}
 		~PinholeCamera() {}
 
-		//归一化屏幕坐标，范围：0~1
-		Ray getRay(float x, float y)
+		//针孔成像后为倒立图像，此处并没有对倒立过程进行纠正
+		Ray getRay(float screenX, float screenY, float randx, float randy)
 		{
-			vector<float> dir = _up * std::tan(_fov / 2) *(y*2.0f - 1.0f) + _right * std::tan(_fov / 2)*_aspect*(x*2.0f - 1.0f) + _front;
-			dir = Normalize(dir);
+			point screenPoint = _origin + _right * (_aspect*(screenX*2.f - 1.f)*_height) + _up * ((screenY*2.f - 1.f)*_height);
+			point lensPoint = _origin + _front * _imageDistance;
+			point focusPoint = lensPoint + (lensPoint - screenPoint) * (_focusDistance / _imageDistance);
+
+			point origin = lensPoint + _right * (std::sqrt(randx) * std::cos(randy*2.f*PI)) + _up * (std::sqrt(randx) * std::sin(randy*2.f*PI)) *_apertureRedius;	//射线从透镜发射
+			vector<float> dir = Normalize(focusPoint - origin);
+			return Ray(origin, dir);
+		}
+
+	private:
+		//透镜描述
+		float _apertureRedius;	//光圈半径
+		float _focusDistance;		//焦距
+		float _imageDistance;		//像距
+
+		//画布描述
+		float _height;
+		float _aspect;
+
+		point _origin;
+		vector<float> _front;
+		vector<float> _up;
+		vector<float> _right;
+	};
+
+	//Pinhole EnviromentCamera		//环境相机， aspect将不起作用
+	class EnviromentCamera :public Camera
+	{
+	public:
+		EnviromentCamera(point origin, vector<float> front, vector<float> up)
+			: _origin(origin)
+		{
+			_right = Normalize(Cross(front, up));
+			_up = Normalize(Cross(_right, front));
+			_front = Normalize(Cross(_up, _right));
+		}
+		~EnviromentCamera() {}
+
+		Ray getRay(float screenX, float screenY, float randx, float randy)
+		{
+			float theta = PI*(1.f - screenY);
+			float phi = 2*PI * screenX;
+			vector<float> dir = _right * (std::sin(theta)*std::cos(phi)) + _front * (std::sin(theta)*std::sin(phi)) + _up * std::cos(theta);
 			return Ray(_origin, dir);
 		}
 
 	private:
-		float _fov;	//竖直方向上夹角
-		float _aspect;		//width/height
+
 		point _origin;
 		vector<float> _front;
 		vector<float> _up;

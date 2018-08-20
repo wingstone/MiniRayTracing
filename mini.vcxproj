@@ -11,15 +11,23 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="bmp.h" />
-    <ClInclude Include="Commen.h" />
-    <ClInclude Include="Core.h" />
-    <ClInclude Include="function.h" />
-    <ClInclude Include="structure.h" />
-    <ClInclude Include="windowDecl.h" />
+    <ClInclude Include="Head\bmp.h" />
+    <ClInclude Include="Head\Commen.h" />
+    <ClInclude Include="Head\Core.h" />
+    <ClInclude Include="Head\function.h" />
+    <ClInclude Include="Head\RTFile.h" />
+    <ClInclude Include="Head\structure.h" />
+    <ClInclude Include="Head\windowDecl.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Main.cpp" />
+    <None Include="ReadMe.md" />
+    <None Include="SceneFile\MyScene.rt" />
+    <None Include="SceneFile\Scene.rt" />
+    <None Include="SceneFile\Scene2.rt" />
+    <None Include="SceneFile\Scene3.rt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Src\Main.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{DE98AF4E-8D47-4711-BE1B-0BBF222957F1}</ProjectGuid>
