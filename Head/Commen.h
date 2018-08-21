@@ -20,6 +20,7 @@ namespace mini{
 		Scene(int width, int height, int spp, int depth, color bgColor):_samplePerPixel(spp), _depth(depth),_bgColor(bgColor){
 			_materialList = new std::vector<Material*>();
 			_modelList = new std::vector<Model*>();
+			_lightList = new std::vector<Light*>();
 			_camera = NULL;
 			_buffer = new UCHAR[width*height * 3];
 			_bmp = NULL;
@@ -37,6 +38,7 @@ namespace mini{
 			}
 			delete _materialList;
 			delete _modelList;
+			delete _lightList;
 			if (_buffer != NULL) delete[] _buffer;
 			if (_bmp != NULL) delete _bmp;
 		}
@@ -149,6 +151,21 @@ namespace mini{
 							_camera = new EnviromentCamera(origin, front, up);
 						}
 					}
+					else if (str.compare("Light") == 0)
+					{
+						stack = 0;
+						str = std::string();
+						str.reserve(2048);
+						while (filestream.get(c))
+						{
+							str.push_back(c);
+							if (c == '{') stack++;
+							if (c == '}') stack--;
+							if (stack == 0) break;
+						}
+						str.shrink_to_fit();
+						getLight(std::stringstream(str));
+					}
 				}
 				else if (c == '/')
 				{
@@ -197,6 +214,7 @@ namespace mini{
 	private:
 		std::vector<Material*>* _materialList;
 		std::vector<Model*>*  _modelList;
+		std::vector<Light*>* _lightList;		//光源同时存在于模型列表与光源列表中
 		Camera* _camera;
 		UCHAR* _buffer;
 		BmpClass* _bmp;
@@ -409,6 +427,33 @@ namespace mini{
 			}
 
 		}
+		void getLight(std::iostream& sstream)
+		{
+			std::string str;
+			while (true)
+			{
+				str = getNextWord(sstream);
+				if (str.compare("Disk") == 0)
+				{
+					point center;
+					float redius;
+					vector<float> nor;
+					int matId;
+					center = getNextVector(sstream);
+					redius = getNextNumber(sstream);
+					nor = getNextVector(sstream);
+					matId = (int)getNextNumber(sstream);
+					Disk* disklight = new Disk(center, redius, nor, true, _materialList->at(matId));
+					_lightList->push_back(disklight);
+					_modelList->push_back(disklight);
+				}
+				else
+				{
+					break;
+				}
+			}
+
+		}
 	
 		//render function
 		void renderRegion(int x, int y, float spp_1)
@@ -446,6 +491,75 @@ namespace mini{
 			}
 
 		}
+
+		//根据光源采样进行积分
+		color SampleLight(size_t lightId, point &rayOrigin, vector<float> * dir,  float* pdf)
+		{
+			size_t count = _lightList->size();
+			Light *light = _lightList->at(lightId);
+
+			float r1 = RandNumber(), r2 = RandNumber();
+			vector<float> lightRay;
+			color col = light->Sample_L(r1, r2, rayOrigin,&lightRay, pdf);
+			*dir = Normalize(lightRay);
+
+			//测试可见性
+			Ray ray(rayOrigin, lightRay);
+			Intersection inter = Intersection::_empty;
+			for (auto i = _modelList->begin(); i != _modelList->end(); i++) {
+
+				Intersection tempInter = (*i)->getIntersection(ray);
+				if (inter._type != EMPTY && tempInter._type != EMPTY && tempInter._t < inter._t) {
+					inter = tempInter;
+				}
+				else if (inter._type == EMPTY && tempInter._type != EMPTY) {
+					inter = tempInter;
+				}
+			}
+
+			if (inter._t < Length(lightRay)-DELTA)
+				return color(0.f, 0.f, 0.f);
+			else
+				return col;
+		}
+
+		//根据材质进行采样 return direction
+		vector<float> SampleBRDF(RefType type, normal &nor, vector<float> &wo, float r1, float r2, float* pdf)
+		{
+			vector<float> dir;
+			vector<float> u, v;
+			if (nor._x == 0) u = Normalize(Cross(vector<float>(1, 0, 0), nor));
+			else u = Normalize(Cross(vector<float>(0, 1, 1), nor));
+			v = Normalize(Cross(nor, u));
+
+			switch (type)
+			{
+			case mini::DIFFUSE:
+			{
+				float phi = r2 * 2 * PI;
+				float r = pow(r1, 0.5);
+				dir = u * r*cos(phi) + v * r*sin(phi) + nor * std::sqrt(1 - r * r);
+
+				float cos_theta = Dot(nor, dir);
+				*pdf = cos_theta / PI;
+				break;
+			}
+			case mini::MIRROR:
+				break;
+			case mini::TRANSP:
+				break;
+			case mini::BLIN:
+				break;
+			case mini::COOK:
+				break;
+			case mini::EMPTY:
+				break;
+			default:
+				break;
+			}
+
+			return dir;
+		}
 		
 		//跟踪射线
 		color rayTrace(Ray ray, int depth)
@@ -479,6 +593,58 @@ namespace mini{
 
 			if (inter._type == DIFFUSE) {		//积分漫反射材质
 
+				//using MIS
+				size_t brdf_samples = 4;
+				float brdf = 1.0f / PI;
+				vector<float> col1;
+				size_t light_samples = _lightList->size();
+				vector<float> col2;
+
+				for (size_t i = 0; i < brdf_samples; i++)
+				{
+					//采用cos加权方法采样
+					float r1 = RandNumber();
+					float r2 = (float(i) + RandNumber()) / float(brdf_samples);
+					float brdf_pdf=0.f, light_pdf= 0.f;
+					vector<float> dir = SampleBRDF(DIFFUSE, inter._nor, -ray._direction, r1, r2, &brdf_pdf);
+					
+					float tmp = 0.f;
+					for (size_t i = 0; i < _lightList->size(); i++)
+					{
+						Ray wi = Ray(inter._pos, dir);
+						tmp = _lightList->at(i)->CalculatePdf(wi);
+						light_pdf = light_pdf > tmp ? light_pdf : tmp;
+					}
+					float f = brdf_pdf * brdf_samples;
+					float g = light_pdf * light_samples;
+					float weight = f * f / (f * f + g * g);
+
+					float cos_theta = Dot(dir, inter._nor);
+					col1 = col1 + mat_col * rayTrace(Ray(inter._pos, dir), depth + 1) * (cos_theta * brdf / brdf_pdf * weight);
+				}
+				col1 = col1 / float(brdf_samples);
+
+				for (size_t i = 0; i < light_samples; i++)
+				{
+					float light_pdf;
+					vector<float> lightCol;
+					vector<float> dir;
+					lightCol = SampleLight(i, inter._pos, &dir, &light_pdf);
+					float cos_theta = Dot(dir, inter._nor);
+
+					float brdf_pdf = cos_theta / PI;
+					float f = brdf_pdf * brdf_samples;
+					float g = light_pdf * light_samples;
+					float weight = g*g / (f * f + g * g);
+
+					if (cos_theta > DELTA)
+						col2 = col2 + mat_col * lightCol * (cos_theta * brdf / light_pdf * weight);
+				}
+				col2 = col2 / float(light_samples);
+
+				return col1 + col2 + inter._material->getEmmision();
+				
+				/*
 				vector<float> u, v;
 				if (inter._nor._x == 0) u = Normalize(Cross(vector<float>(1, 0, 0), inter._nor));
 				else u = Normalize(Cross(vector<float>(0, 1, 1), inter._nor));
@@ -491,16 +657,17 @@ namespace mini{
 				for (size_t i = 0; i < brdf_samples; i++)
 				{
 					float rd = RandNumber();
-					float phi = (float(i) + RandNumber() ) / float(brdf_samples) * 2 * PI;		//phi进行分层采样
+					float phi = (float(i) + RandNumber()) / float(brdf_samples) * 2 * PI;		//phi进行分层采样
 					float r = pow(rd, 0.5);
-					vector<float> dir = u*r*cos(phi) + v*r*sin(phi) + inter._nor * std::sqrt(1 - r*r);
+					vector<float> dir = u * r*cos(phi) + v * r*sin(phi) + inter._nor * std::sqrt(1 - r * r);
 
 					float cos_theta = Dot(inter._nor, dir);
 					float pdf = cos_theta / PI;
-					color =color + inter._material->getEmmision() + mat_col *rayTrace(Ray(inter._pos, dir), depth + 1) * cos_theta * brdf / pdf;
+					color = color + inter._material->getEmmision() + mat_col * rayTrace(Ray(inter._pos, dir), depth + 1) * cos_theta * brdf / pdf;
 				}
 
 				return color / float(brdf_samples);
+				*/
 			}
 			else if (inter._type == MIRROR){			//积分镜面反射材质	针对Alpha分布，不采用MC积分
 				vector<float> dir = ray._direction - inter._nor * 2 * Dot(ray._direction, inter._nor);

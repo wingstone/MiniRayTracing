@@ -55,6 +55,12 @@ namespace mini
 		return sqrt(Dot(vec, vec));
 	}
 
+	float Distance(const vector<float> &vec0, const vector<float> &vec1)
+	{
+		vector<float> vec = vec1 - vec0;
+		return Length(vec);
+	}
+
 	//长度平方
 	float LenSquare(const vector<float> &vec)
 	{

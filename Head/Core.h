@@ -29,6 +29,9 @@ namespace mini
 		Ray(point origin, vector<float> dir) :_origin(origin), _direction(Normalize(dir)){}
 	};
 
+	//=========================================
+	//material
+
 	//Material base class
 	class Material
 	{
@@ -131,6 +134,9 @@ namespace mini
 		float _reflectionPower;
 	};
 
+	//=========================================
+	//model、light
+
 	//Intersection class
 	class Model;	//提前声明
 	struct Intersection
@@ -159,6 +165,23 @@ namespace mini
 		virtual bool inModel(point po) = 0;
 		virtual Intersection getIntersection(Ray ray) = 0;
 
+	};
+
+	//light base class
+	class Light
+	{
+	public:
+		Light() {};
+		~Light() {};
+
+		//rand范围：0~1
+		virtual color Sample_L(float rand1, float rand2, point rayOrigin, vector<float> *lightRay, float* pdf) = 0;
+		virtual float CalculatePdf(Ray& ray) = 0;
+		virtual float GetArea() = 0;
+		virtual bool IsLight()
+		{
+			return false;
+		}
 	};
 
 	//Sphere
@@ -211,6 +234,87 @@ namespace mini
 		point _center;
 		float _redius;
 		Material* _material;
+	};
+
+	//Disk
+	class Disk : public Model,public Light
+	{
+	public:
+		Disk(point center, float redius, vector<float> direction, bool islight, Material*  material)
+			:_center(center), _redius(redius), _isLight(islight), _material(material) 
+		{
+			_direction = Normalize(direction);
+		}
+		~Disk() {};
+
+		bool inModel(point po) {
+			return false;
+		}
+
+		Intersection getIntersection(Ray ray)
+		{
+			if (Dot(ray._direction, _direction) > DELTA)
+				return Intersection::_empty;
+
+			float d = -Dot(_center, _direction);
+
+			float t = -(d + Dot(_direction, ray._origin)) / Dot(_direction, ray._direction);
+			if (t < DELTA)
+				return Intersection::_empty;
+
+			point interPoint = ray._origin + ray._direction*t;
+			return Length(interPoint - _center) > _redius + DELTA ? Intersection::_empty : Intersection(interPoint, _direction, t, _material->_reftype, _material, this);
+		}
+
+		//light
+
+		bool IsLight()
+		{
+			return _isLight;
+		}
+
+		color Sample_L(float rand1, float rand2, point rayOrigin, vector<float> *lightRay, float* pdf)
+		{
+			vector<float> u, v;
+			if (_direction._x == 0) u = Normalize(Cross(vector<float>(1, 0, 0), _direction));
+			else u = Normalize(Cross(vector<float>(0, 1, 1), _direction));
+			v = Normalize(Cross(_direction, u));
+
+			float phi = rand2* 2 * PI;		//phi进行分层采样
+			float r = std::sqrt(rand1)*_redius;
+			point pos =  _center + u * r*cos(phi) + v * r*sin(phi);
+
+			*lightRay = pos - rayOrigin;
+			 vector<float> dir = Normalize(*lightRay);
+			 if (Dot(-dir, _direction) == 0)
+				 *pdf = 0.f;
+			 else
+				 *pdf = Dot(*lightRay, *lightRay) /( GetArea()*Dot(-dir, _direction));
+
+			 return _material->getEmmision();
+		}
+
+		float CalculatePdf(Ray& ray)
+		{
+			Intersection inter = getIntersection(ray);
+			if (inter._type == EMPTY)
+				return 0.f;
+			else
+				return  inter._t*inter._t / (GetArea()*Dot(-ray._direction, _direction));
+		}
+
+		float GetArea()
+		{
+			return PI * _redius*_redius;
+		}
+
+	private:
+		point _center;
+		float _redius;
+		vector<float> _direction;
+		Material* _material;
+
+		bool _isLight;
 	};
 
 	//axis align Box
@@ -421,7 +525,7 @@ namespace mini
 		Material* _material;
 	};
 
-	//以逆时针顺序初始化 法线由右手准则确定 仅支持凸多边形
+	//以逆时针顺序初始化 法线由右手准则确定 仅支持凸四边形
 	class Polygon :public Model
 	{
 	public:
@@ -516,6 +620,9 @@ namespace mini
 		normal _normal;
 		Material* _material;
 	};
+
+	//=========================================
+	//camera
 
 	//Camera; 原点为左下角
 	class Camera
