@@ -230,13 +230,13 @@ namespace mini
 			}
 		}
 
-	private:
+	protected:
 		point _center;
 		float _redius;
 		Material* _material;
 	};
 
-	//Disk
+	//Disk_light
 	class Disk : public Model,public Light
 	{
 	public:
@@ -314,6 +314,69 @@ namespace mini
 		vector<float> _direction;
 		Material* _material;
 
+		bool _isLight;
+	};
+
+	//Sphere_light
+	class Sphere_Light : public Sphere, public Light
+	{
+	public:
+		Sphere_Light(point center, float redius,  bool islight, Material*  material)
+			: Sphere(center, redius, material), _isLight(islight)
+		{
+		}
+		~Sphere_Light() {};
+
+		//light
+
+		bool IsLight()
+		{
+			return _isLight;
+		}
+
+		color Sample_L(float rand1, float rand2, point rayOrigin, vector<float> *lightRay, float* pdf)
+		{
+			vector<float> u, v, w;
+			u = vector<float>(1, 0, 0);
+			v = vector<float>(0, 0, 1);
+			w = vector<float>(0, 1, 0);
+
+			float phi = rand2 * 2 * PI;		//phi进行分层采样
+			float z = 1.f - 2.f*rand1;
+			float x = std::cos(phi)*2.f*std::sqrt(1.f - rand1 * rand1);
+			float y = std::sin(phi)*2.f*std::sqrt(1.f - rand1 * rand1);
+
+			vector<float> nor = u * x + v * y + w * z;
+			point pos = _center + nor *_redius;
+
+			*lightRay = pos - rayOrigin;
+			vector<float> dir = Normalize(*lightRay);
+			if (Dot(dir, nor) == 0)
+				*pdf = 0.f;
+			else
+				*pdf = Dot(*lightRay, *lightRay) / (GetArea()*Dot(dir, nor));
+
+			return _material->getEmmision();
+		}
+
+		float CalculatePdf(Ray& ray)
+		{
+			Intersection inter = getIntersection(ray);
+			if (inter._type == EMPTY)
+				return 0.f;
+			else
+			{
+				vector<float> nor = Normalize(inter._pos - _center);
+				return  inter._t*inter._t / (GetArea()*Dot(-ray._direction, nor));
+			}
+		}
+
+		float GetArea()
+		{
+			return PI * _redius*_redius * 4.f;
+		}
+
+	private:
 		bool _isLight;
 	};
 
@@ -734,7 +797,7 @@ namespace mini
 		vector<float> _right;
 	};
 
-	//Pinhole EnviromentCamera		//环境相机， aspect将不起作用
+	//Enviroment Camera		//环境相机， aspect将不起作用
 	class EnviromentCamera :public Camera
 	{
 	public:

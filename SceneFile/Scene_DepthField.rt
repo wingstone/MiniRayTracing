@@ -1,0 +1,55 @@
+//区分大小写 右手坐标系
+Material{
+	DiffuseMaterial{	//0
+		RefType:DIFFUSE; Emmision:13,13,13; Color:1,1,1;	//light
+	}
+	DiffuseMaterial{	//1
+		RefType:DIFFUSE; Emmision:0,0,0; Color:1,0,0;			//Red
+	}
+	DiffuseMaterial{	//2
+		RefType:DIFFUSE; Emmision:0,0,0; Color:0,1,0;			//Green
+	}
+	DiffuseMaterial{	//3
+		RefType:DIFFUSE; Emmision:0,0,0; Color:1,1,1;			//White
+	}
+	ReflectMaterial{	//4
+		RefType:MIRROR; Color:1,1,1;		//Mirror
+	}
+	TranspMaterial{	//5
+		RefType:TRANSP; Fresnal:0.04; ReftIndex:1.5; Color:1,1,1;		//Glass
+	}
+}
+Model{
+	Plane{	//0 wallFront
+		Center:0,0,-5; Normal:0,0,1; Material: 3;
+	}
+	Box{	//1 wallLeft
+		MinPosition:-5.8,-5.25,-5.25; MaxPosition:-5.75,5.25,5.25; Material: 1;
+	}
+	Box{	//2 wallRight
+		MinPosition:5.75,-5.25,-5.25; MaxPosition:5.8,5.25,5.25; Material: 2;
+	}
+	Box{	//3 wallBottom
+		MinPosition:-5.8,-5.25,-5.25; MaxPosition:5.8,-5,5.25; Material: 3;
+	}
+	Box{	//4 wallTop
+		MinPosition:-5.8,5,-5.25; MaxPosition:5.8,5.25,5.25; Material: 3;
+	}
+	Sphere{	//6	mirror
+		Center:-2.5,-3,-2; Redius:2; Material: 4;
+	}
+	Sphere{	//7	glass
+		Center:2.5,-3,2; Redius:2; Material: 5;
+	}
+}
+Light{
+	Disk{	//6 light
+		Center:0.0, 4.99, 0.0; Redius:2.5; Normal:0.0, -1.0, 0.0; Material: 0;
+	}
+}
+Camera{
+	PinholeCamera{
+		ApertureRedius:0.1; FocusDistance:27; imageDistance:1;
+		Height:0.25; Aspect: 1.0; Point:0,0,30; Front:0,0,-1; Up:0,1,0;
+	}
+}

@@ -228,7 +228,7 @@ namespace mini{
 		//file function
 		inline bool isAlpha(char c)
 		{
-			return c >= 'a'&&c <= 'z' || c >= 'A'&&c <= 'Z';
+			return c >= 'a'&&c <= 'z' || c >= 'A'&&c <= 'Z' || c == '_';
 		}
 		inline bool isNumber(char c)
 		{
@@ -447,6 +447,18 @@ namespace mini{
 					_lightList->push_back(disklight);
 					_modelList->push_back(disklight);
 				}
+				else if (str.compare("Sphere_Light") == 0)
+				{
+					point center;
+					float redius;
+					int matId;
+					center = getNextVector(sstream);
+					redius = getNextNumber(sstream);
+					matId = (int)getNextNumber(sstream);
+					Sphere_Light* sphLight = new Sphere_Light(center, redius, true, _materialList->at(matId));
+					_lightList->push_back(sphLight);
+					_modelList->push_back(sphLight);
+				}
 				else
 				{
 					break;
@@ -597,7 +609,7 @@ namespace mini{
 				size_t brdf_samples = 4;
 				float brdf = 1.0f / PI;
 				vector<float> col1;
-				size_t light_samples = _lightList->size();
+				size_t light_samples = _lightList->size();		//全光源采样
 				vector<float> col2;
 
 				for (size_t i = 0; i < brdf_samples; i++)
@@ -609,12 +621,13 @@ namespace mini{
 					vector<float> dir = SampleBRDF(DIFFUSE, inter._nor, -ray._direction, r1, r2, &brdf_pdf);
 					
 					float tmp = 0.f;
-					for (size_t i = 0; i < _lightList->size(); i++)
+					for (size_t i = 0; i < light_samples; i++)
 					{
 						Ray wi = Ray(inter._pos, dir);
 						tmp = _lightList->at(i)->CalculatePdf(wi);
 						light_pdf = light_pdf > tmp ? light_pdf : tmp;
 					}
+					light_pdf *= 1.f / light_samples;
 					float f = brdf_pdf * brdf_samples;
 					float g = light_pdf * light_samples;
 					float weight = f * f / (f * f + g * g);
@@ -630,6 +643,7 @@ namespace mini{
 					vector<float> lightCol;
 					vector<float> dir;
 					lightCol = SampleLight(i, inter._pos, &dir, &light_pdf);
+					light_pdf *= 1.f / light_samples;
 					float cos_theta = Dot(dir, inter._nor);
 
 					float brdf_pdf = cos_theta / PI;

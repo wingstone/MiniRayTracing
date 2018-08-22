@@ -18,7 +18,7 @@ using namespace mini;
 //Ö÷º¯Êý
 int main(int argc, char* argv[])
 {
-	int spp = 4, depth = 4;
+	int spp = 1, depth = 1;
 #ifndef _DEBUG
 	if (argc != 2)
 	{
@@ -40,7 +40,7 @@ int main(int argc, char* argv[])
 #ifndef _DEBUG
 		scene->initFromFile(argv[1]);
 #else
-		scene->initFromFile("Scene_CurnellBox.rt");
+		scene->initFromFile("Scene_BlinMicrofacet.rt");
 #endif // !_DEBUG
 		scene->renderAndWrite("RayTracing.bmp");
 		delete scene;
