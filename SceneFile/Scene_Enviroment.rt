@@ -1,22 +1,22 @@
 //区分大小写 右手坐标系
 Material{
 	DiffuseMaterial{	//0
-		RefType:DIFFUSE; Emmision:13,13,13; Color:1,1,1;	//light
+		RefType:DIFFUSE;Emmision:12,12,12;Color:0,0,0;	//light
 	}
 	DiffuseMaterial{	//1
-		RefType:DIFFUSE; Emmision:0,0,0; Color:1,0,0;			//Red
+		RefType:DIFFUSE;Emmision:0,0,0;Color:0.75,0.25,0.25;			//Red
 	}
 	DiffuseMaterial{	//2
-		RefType:DIFFUSE; Emmision:0,0,0; Color:0,1,0;			//Green
+		RefType:DIFFUSE;Emmision:0,0,0;Color:0.25,0.25,0.75;			//Green
 	}
 	DiffuseMaterial{	//3
-		RefType:DIFFUSE; Emmision:0,0,0; Color:1,1,1;			//White
+		RefType:DIFFUSE;Emmision:0,0,0;Color:0.75,0.75,0.75;			//White
 	}
 	ReflectMaterial{	//4
-		RefType:MIRROR; Color:1,1,1;		//Mirror
+		RefType:MIRROR;	Color:1,1,1;		//Mirror
 	}
 	TranspMaterial{	//5
-		RefType:TRANSP; Fresnal:0.04; ReftIndex:1.5; Color:1,1,1;		//Glass
+		RefType:TRANSP; Fresnal:0.04; ReftIndex:1.5; Color:0.7,1,0.9;		//Glass
 	}
 }
 Model{

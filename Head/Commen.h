@@ -1,5 +1,6 @@
-#ifndef  MINI_COMMEN
-#define  MINI_COMMEN
+#pragma once
+
+//#define TRANDITION_TRACING_METHOD
 
 #include <vector>
 #include <sstream>
@@ -20,7 +21,7 @@ namespace mini{
 		Scene(int width, int height, int spp, int depth, color bgColor):_samplePerPixel(spp), _depth(depth),_bgColor(bgColor){
 			_materialList = new std::vector<Material*>();
 			_modelList = new std::vector<Model*>();
-			_lightList = new std::vector<Light*>();
+			_lightList = new std::vector<Model*>();
 			_camera = NULL;
 			_buffer = new UCHAR[width*height * 3];
 			_bmp = NULL;
@@ -190,14 +191,11 @@ namespace mini{
 			std::cout << sum;
 			std::cout << "%";
 
-//采样OpenMP并行处理		//如果采用并行处理，字符输出可能顺序混乱
-//#pragma omp parallel for
 			for (int i = 0; i < 10; i++)
 			{		//从左到右
 				for (int j = 0; j < 10; j++)
 				{		//从下到上
 					renderRegion(i, j, spp_1);
-//#pragma omp atomic
 					sum++;
 					std::cout << "\b\b\b\b\b";
 					std::cout.width(4);
@@ -214,7 +212,7 @@ namespace mini{
 	private:
 		std::vector<Material*>* _materialList;
 		std::vector<Model*>*  _modelList;
-		std::vector<Light*>* _lightList;		//光源同时存在于模型列表与光源列表中
+		std::vector<Model*>* _lightList;		//光源同时存在于模型列表与光源列表中
 		Camera* _camera;
 		UCHAR* _buffer;
 		BmpClass* _bmp;
@@ -433,7 +431,7 @@ namespace mini{
 			while (true)
 			{
 				str = getNextWord(sstream);
-				if (str.compare("Disk") == 0)
+				if (str.compare("Disk_Light") == 0)
 				{
 					point center;
 					float redius;
@@ -443,7 +441,7 @@ namespace mini{
 					redius = getNextNumber(sstream);
 					nor = getNextVector(sstream);
 					matId = (int)getNextNumber(sstream);
-					Disk* disklight = new Disk(center, redius, nor, true, _materialList->at(matId));
+					Disk_Light* disklight = new Disk_Light(center, redius, nor, true, _materialList->at(matId));
 					_lightList->push_back(disklight);
 					_modelList->push_back(disklight);
 				}
@@ -480,7 +478,7 @@ namespace mini{
 					color col = color();
 
 					//采用分层采样进行采样,针对于每个像素
-					int sqrt_spp = std::round(std::sqrt(_samplePerPixel));
+					int sqrt_spp = (int)std::round(std::sqrt(_samplePerPixel));
 					for (int s1 = 0; s1 < sqrt_spp; s1++)
 						for (int s2 = 0; s2 < sqrt_spp; s2++) {
 							r1 = (s1 + RandNumber()) / float(sqrt_spp);
@@ -489,11 +487,12 @@ namespace mini{
 							float screenY = ( (s1 + r2) / float(sqrt_spp) + j + y*sub_hei) / _height;
 
 							Ray ray = _camera->getRay(screenX, screenY, r1, r2);
-							col = col + rayTrace(ray, 0)*spp_1;
+							col = col + rayTrace(ray, _depth);
 						}
 
 					//Gamma 校正
-					col = Power(col);
+					col = col / (float)_samplePerPixel;
+					col = Power(col, 1.f/2.2f);
 
 					//文件写入顺序：以bgr顺序写入三个字节
 					_buffer[3 * (x * sub_wid + i + (y * sub_hei + j)*_width)] = int(Saturate(col._z) * 255);
@@ -503,20 +502,19 @@ namespace mini{
 			}
 
 		}
-
-		//根据光源采样进行积分
-		color SampleLight(size_t lightId, point &rayOrigin, vector<float> * dir,  float* pdf)
+		
+		//跟踪射线
+		color rayTrace(Ray ray, int depth)
 		{
-			size_t count = _lightList->size();
-			Light *light = _lightList->at(lightId);
+			color col = color();
+			vector<float> mask(1.f, 1.f, 1.f);
+			bool hitSpeculer = false;
 
-			float r1 = RandNumber(), r2 = RandNumber();
-			vector<float> lightRay;
-			color col = light->Sample_L(r1, r2, rayOrigin,&lightRay, pdf);
-			*dir = Normalize(lightRay);
+#ifdef TRANDITION_TRACING_METHOD
 
-			//测试可见性
-			Ray ray(rayOrigin, lightRay);
+			if (depth == 0) return _bgColor;
+
+			//select closet model;
 			Intersection inter = Intersection::_empty;
 			for (auto i = _modelList->begin(); i != _modelList->end(); i++) {
 
@@ -529,281 +527,324 @@ namespace mini{
 				}
 			}
 
-			if (inter._t < Length(lightRay)-DELTA)
-				return color(0.f, 0.f, 0.f);
-			else
-				return col;
-		}
-
-		//根据材质进行采样 return direction
-		vector<float> SampleBRDF(RefType type, normal &nor, vector<float> &wo, float r1, float r2, float* pdf)
-		{
-			vector<float> dir;
-			vector<float> u, v;
-			if (nor._x == 0) u = Normalize(Cross(vector<float>(1, 0, 0), nor));
-			else u = Normalize(Cross(vector<float>(0, 1, 1), nor));
-			v = Normalize(Cross(nor, u));
-
-			switch (type)
-			{
-			case mini::DIFFUSE:
-			{
-				float phi = r2 * 2 * PI;
-				float r = pow(r1, 0.5);
-				dir = u * r*cos(phi) + v * r*sin(phi) + nor * std::sqrt(1 - r * r);
-
-				float cos_theta = Dot(nor, dir);
-				*pdf = cos_theta / PI;
-				break;
-			}
-			case mini::MIRROR:
-				break;
-			case mini::TRANSP:
-				break;
-			case mini::BLIN:
-				break;
-			case mini::COOK:
-				break;
-			case mini::EMPTY:
-				break;
-			default:
-				break;
-			}
-
-			return dir;
-		}
-		
-		//跟踪射线
-		color rayTrace(Ray ray, int depth)
-		{
-			if (depth >= _depth) return color(0,0,0);
-			
-			//select closest model;
-			Intersection inter = Intersection::_empty;
-			for (auto i = _modelList->begin(); i != _modelList->end(); i++) {
-
-				Intersection tempInter = (*i)->getIntersection(ray);
-				if (inter._type != EMPTY && tempInter._type != EMPTY&& tempInter._t < inter._t) {
-					inter = tempInter;
-				}
-				else if (inter._type == EMPTY&& tempInter._type != EMPTY){
-					inter = tempInter;
-				}
-			}
-
 			if (inter._type == EMPTY)
+			{
 				return _bgColor;
+			}
 
 			//俄罗斯轮盘赌
-			vector<float> mat_col = inter._material->getColor();
-			float russian_p = Max(mat_col);
-			if (depth > 5)
-				if(RandNumber() < russian_p)
-					mat_col = mat_col / russian_p;
+			color mat_col = inter._material->getColor();
+			float p = Max(mat_col);
+			if(_depth -  depth >4)
+				if ( RandNumber() < p)
+				{
+					mat_col = mat_col / p;
+				}
 				else
+				{
 					return inter._material->getEmmision();
-
-			if (inter._type == DIFFUSE) {		//积分漫反射材质
-
-				//using MIS
-				size_t brdf_samples = 4;
-				float brdf = 1.0f / PI;
-				vector<float> col1;
-				size_t light_samples = _lightList->size();		//全光源采样
-				vector<float> col2;
-
-				for (size_t i = 0; i < brdf_samples; i++)
-				{
-					//采用cos加权方法采样
-					float r1 = RandNumber();
-					float r2 = (float(i) + RandNumber()) / float(brdf_samples);
-					float brdf_pdf=0.f, light_pdf= 0.f;
-					vector<float> dir = SampleBRDF(DIFFUSE, inter._nor, -ray._direction, r1, r2, &brdf_pdf);
-					
-					float tmp = 0.f;
-					for (size_t i = 0; i < light_samples; i++)
-					{
-						Ray wi = Ray(inter._pos, dir);
-						tmp = _lightList->at(i)->CalculatePdf(wi);
-						light_pdf = light_pdf > tmp ? light_pdf : tmp;
-					}
-					light_pdf *= 1.f / light_samples;
-					float f = brdf_pdf * brdf_samples;
-					float g = light_pdf * light_samples;
-					float weight = f * f / (f * f + g * g);
-
-					float cos_theta = Dot(dir, inter._nor);
-					col1 = col1 + mat_col * rayTrace(Ray(inter._pos, dir), depth + 1) * (cos_theta * brdf / brdf_pdf * weight);
-				}
-				col1 = col1 / float(brdf_samples);
-
-				for (size_t i = 0; i < light_samples; i++)
-				{
-					float light_pdf;
-					vector<float> lightCol;
-					vector<float> dir;
-					lightCol = SampleLight(i, inter._pos, &dir, &light_pdf);
-					light_pdf *= 1.f / light_samples;
-					float cos_theta = Dot(dir, inter._nor);
-
-					float brdf_pdf = cos_theta / PI;
-					float f = brdf_pdf * brdf_samples;
-					float g = light_pdf * light_samples;
-					float weight = g*g / (f * f + g * g);
-
-					if (cos_theta > DELTA)
-						col2 = col2 + mat_col * lightCol * (cos_theta * brdf / light_pdf * weight);
-				}
-				col2 = col2 / float(light_samples);
-
-				return col1 + col2 + inter._material->getEmmision();
-				
-				/*
-				vector<float> u, v;
-				if (inter._nor._x == 0) u = Normalize(Cross(vector<float>(1, 0, 0), inter._nor));
-				else u = Normalize(Cross(vector<float>(0, 1, 1), inter._nor));
-				v = Normalize(Cross(inter._nor, u));
-
-				//采用cos加权方法采样	：单位圆采样投至单位球
-				size_t brdf_samples = 4;
-				float brdf = 1.0f / PI;
-				vector<float> color;
-				for (size_t i = 0; i < brdf_samples; i++)
-				{
-					float rd = RandNumber();
-					float phi = (float(i) + RandNumber()) / float(brdf_samples) * 2 * PI;		//phi进行分层采样
-					float r = pow(rd, 0.5);
-					vector<float> dir = u * r*cos(phi) + v * r*sin(phi) + inter._nor * std::sqrt(1 - r * r);
-
-					float cos_theta = Dot(inter._nor, dir);
-					float pdf = cos_theta / PI;
-					color = color + inter._material->getEmmision() + mat_col * rayTrace(Ray(inter._pos, dir), depth + 1) * cos_theta * brdf / pdf;
 				}
 
-				return color / float(brdf_samples);
-				*/
+			if (inter._type == DIFFUSE || inter._type == BLIN || inter._type == COOK) {		//积分漫反射材质
+
+				ray._origin = inter._pos;
+				vector<float> z = inter._nor;
+				z = Normalize(z);
+				vector<float> x = z._z <= 0.5f ? Cross(vector<float>(0.f, 0.f, 1.f), z) : Cross(vector<float>(0.f, 1.f, 0.f), z);
+				x = Normalize(x);
+				vector<float> y = Cross(z, x);
+				y = Normalize(y);
+
+				float rand1 = RandNumber();
+				float rand2 = RandNumber();
+				float pdf = 0.f;
+				float brdf = 0.f;
+				vector<float> reflDir = inter._material->Simple_BRDF(ray._direction, rand1, rand2, inter._nor, &pdf, &brdf);
+				ray._direction = reflDir;
+
+				float cosTheta = Dot(inter._nor, ray._direction);
+				col =  inter._material->getEmmision() + mat_col *rayTrace(ray, --depth)*brdf*cosTheta / pdf;
 			}
-			else if (inter._type == MIRROR){			//积分镜面反射材质	针对Alpha分布，不采用MC积分
+			else if (inter._type == MIRROR) {			//积分镜面反射材质
 				vector<float> dir = ray._direction - inter._nor * 2 * Dot(ray._direction, inter._nor);
-				return mat_col * rayTrace(Ray(inter._pos, dir), depth + 1);
+				ray._origin = inter._pos;
+				ray._direction = Normalize(dir);
+				col = mat_col * rayTrace(ray, --depth);
 			}
-			else if (inter._type == TRANSP){			//积分透射材质		针对Alpha分布，不采用MC积分
+			else if (inter._type == TRANSP) {			//积分透射材质
+				float reftIndex = inter._material->getReftrectRate();
 				float fresnel0 = inter._material->getFresnel();
 				float fresnel = fresnel0 + (1 - fresnel0)*(pow(1 + Dot(ray._direction, inter._nor), 5));		//反射项所占比例
 				vector<float> reflDir = ray._direction - inter._nor * 2 * Dot(ray._direction, inter._nor);
 				float reftRate = inter._material->getReftrectRate();
 				vector<float> reftDir;
 				float co = Dot(ray._direction, inter._nor);
-				float si2 = 1 - co*co;
+				float si2 = 1.f - co * co;
 				if (inter._model->inModel(ray._origin))
 				{
-					if (si2 > 1 / (1.5*1.5))return rayTrace(Ray(inter._pos, reflDir), depth + 1);
-					reftDir = (ray._direction - inter._nor * Dot(ray._direction, inter._nor)) * reftRate - inter._nor*pow(1 - (si2 *reftRate*reftRate), 0.5);
+					if (si2 > 1.f / (reftIndex*reftIndex)) return _bgColor;
+					reftDir = (ray._direction - inter._nor * Dot(ray._direction, inter._nor)) * reftRate - inter._nor*pow(1 - (si2 *reftRate*reftRate), 0.5f);
 				}
 				else
 				{
-					reftDir = (ray._direction - inter._nor * Dot(ray._direction, inter._nor)) / reftRate - inter._nor*pow(1 - si2 / (reftRate*reftRate), 0.5);
+					reftDir = (ray._direction - inter._nor * Dot(ray._direction, inter._nor)) / reftRate - inter._nor*pow(1 - si2 / (reftRate*reftRate), 0.5f);
 				}
-				return mat_col * (rayTrace(Ray(inter._pos, reflDir), depth + 1)*fresnel + rayTrace(Ray(inter._pos, reftDir), depth + 1)*(1 - fresnel) );
-			}
-			//还需要改进
-			else if (inter._type == COOK){			//积分Cook材质	
+				ray._origin = inter._pos;
 
-				vector<float> u, v;
-				if (inter._nor._x == 0) u = Normalize(Cross(vector<float>(1, 0, 0), inter._nor));
-				else u = Normalize(Cross(vector<float>(0, 1, 1), inter._nor));
-				v = Normalize(Cross(inter._nor, u));
-
-				float roughness = inter._material->getRoughness();
-				vector<float> color;
-				size_t brdf_samples = 4;
-				for (size_t i = 0; i < brdf_samples; i++)
-				{
-					//重要性采样  根据D的分布来进行采样		参考：PBRT第三版808页		//个人感觉有错误，该pdf并没有在半球范围内进行归一化
-					float rd = RandNumber();
-					float phi = (float(i) + RandNumber()) / float(brdf_samples) * 2.f * PI;		//分层采样
-					float tan2_theta = -roughness* roughness*std::log(rd);
-					float cos_theta_h = 1.f/std::sqrt(1.f + tan2_theta);
-					float sin_theta_h = std::sqrt(max(0.f, 1.0f - cos_theta_h * cos_theta_h));
-					vector<float> H = Normalize(u*sin_theta_h*std::cos(phi) + v * sin_theta_h*std::sin(phi) + inter._nor * cos_theta_h);
-					vector<float> refldir = ray._direction + H * Dot(-ray._direction, H) * 2.f;
-
-					//计算BRDF
-					float g1 = 2 * Dot(H, inter._nor)*Dot(inter._nor, -ray._direction) / Dot(-ray._direction, H);
-					float g2 = 2 * Dot(H, inter._nor)*Dot(inter._nor, refldir) / Dot(-ray._direction, H);
-					float G = g1 < g2 ? g1 : g2;
-					G = 1 < g1 ? 1 : g1;
-					G = G < 0 ? 0 : G;
-
-					float fresnel0 = inter._material->getFresnel();
-					float fresnel = fresnel0 + (1 - fresnel0)*(pow(1 + Dot(ray._direction, inter._nor), 5));		//反射项所占比例
-
-					float dot_N_H = Dot(inter._nor, H);
-					float D = std::exp(-tan2_theta / (roughness*roughness)) / (roughness*roughness * std::pow(cos_theta_h, 4)* PI);
-
-					float brdf = D * G*fresnel / (4.f*Dot(inter._nor, -ray._direction)*Dot(inter._nor, refldir));
-					if (brdf < 0.f) brdf = 0.f;
-
-					//计算 PDF
-					float pdf_h = D * g1*Dot(H, -ray._direction) / Dot(inter._nor, -ray._direction);
-					float pdf = pdf_h / (4.f * Dot(H, -ray._direction));
-
-					vector<float> incolor = rayTrace(Ray(inter._pos, refldir), depth + 1);
-					color = color + inter._material->getEmmision() +
-						mat_col * incolor * brdf *Dot(inter._nor, refldir) / pdf;
-				}
-				return color / float(brdf_samples);
-			}
-			else if (inter._type == BLIN) {			//积分Blin微面元材质	
-
-				vector<float> u, v;
-				if (inter._nor._x == 0) u = Normalize(Cross(vector<float>(1, 0, 0), inter._nor));
-				else u = Normalize(Cross(vector<float>(0, 1, 1), inter._nor));
-				v = Normalize(Cross(inter._nor, u));
-
-				float power = inter._material->getReflectionPower();
-				vector<float> color;
-				size_t brdf_samples = 4;
-				for (size_t i = 0; i < brdf_samples; i++)
-				{
-					//重要性采样  根据D的分布来进行采样
-					float rd = RandNumber();
-					float phi = (float(i) + RandNumber() ) / float(brdf_samples) * 2.f * PI;
-					float cos_theta_h = std::pow(rd, 1.0f/ (power + 1.f));
-					float sin_theta_h = std::sqrt(max(0.f, 1.0f - cos_theta_h * cos_theta_h));
-					vector<float> H = Normalize(u*sin_theta_h*std::cos(phi) + v * sin_theta_h*std::sin(phi) + inter._nor * cos_theta_h);
-					vector<float> refldir = ray._direction + H * Dot(-ray._direction, H) * 2.f;
-
-					//计算 PDF
-					float pdf = (power + 1.f)*std::pow(cos_theta_h, power) / (4.f * Dot(-ray._direction, H) * 2.f * PI);
-
-					//计算BRDF
-					float g1 = 2 * Dot(H, inter._nor)*Dot(inter._nor, -ray._direction) / Dot(-ray._direction, H);
-					float g2 = 2 * Dot(H, inter._nor)*Dot(inter._nor, refldir) / Dot(-ray._direction, H);
-					float G = g1 < g2 ? g1 : g2;
-					G = 1 < g1 ? 1 : g1;
-					G = G < 0 ? 0 : G;
-
-					float fresnel0 = inter._material->getFresnel();
-					float fresnel = fresnel0 + (1 - fresnel0)*(pow(1 + Dot(ray._direction, inter._nor), 5));		//反射项所占比例
-
-					float dot_N_H = Dot(inter._nor, H);
-					float D = (power + 2.f)*std::pow(dot_N_H, power) / (2.f*PI);
-
-					float brdf = D * G*fresnel / (4.f*Dot(inter._nor, -ray._direction)*Dot(inter._nor, refldir));
-					if (brdf < 0.f) brdf = 0.f;
-					vector<float> incolor = rayTrace(Ray(inter._pos, refldir), depth + 1);
-					color = color + inter._material->getEmmision() +
-						mat_col * incolor * brdf *Dot(inter._nor, refldir) / pdf;
-				}
-				return color / float(brdf_samples);
+				Ray refRay(inter._pos, reflDir);
+				Ray reftRay(inter._pos, reftDir);
+				depth--;
+				col = mat_col * rayTrace(refRay, depth)*fresnel + mat_col * rayTrace(reftRay, depth)*(1.f- fresnel);
 			}
 			else
 			{
-				return _bgColor;
+				col = _bgColor;
 			}
+
+#else
+
+			//光线每一步进行迭代
+			for (int i = 0; i < depth; i++)
+			{
+				//select closet model;
+				Intersection inter = Intersection::_empty;
+				for (auto i = _modelList->begin(); i != _modelList->end(); i++) {
+
+					Intersection tempInter = (*i)->getIntersection(ray);
+					if (inter._type != EMPTY && tempInter._type != EMPTY&& tempInter._t < inter._t) {
+						inter = tempInter;
+					}
+					else if (inter._type == EMPTY&& tempInter._type != EMPTY){
+						inter = tempInter;
+					}
+				}
+
+				if (inter._type == EMPTY)
+				{
+					col = _bgColor * mask + col;
+					break;
+				}
+
+				//return normal for debug
+				//if(i == 1)
+				//	return (inter._nor + vector<float>(1.f,1.f,1.f)) / 2.f;	
+
+				//第一次击中光源or经过镜面
+				if (inter._model->IsLight() && i == 0 || hitSpeculer)
+				{
+					col = col + mask*inter._material->getEmmision();
+					hitSpeculer = false;
+				}
+
+				if (inter._type == MIRROR){			//积分镜面反射材质
+					hitSpeculer = true;
+
+					vector<float> dir = ray._direction - inter._nor * 2 * Dot(ray._direction, inter._nor);
+					ray._origin = inter._pos;
+					ray._direction = Normalize(dir);
+					mask = mask * inter._material->getColor();
+				}
+				else if (inter._type == TRANSP){			//积分透射材质
+					hitSpeculer = true;
+
+					float reftIndex = inter._material->getReftrectRate();
+					float fresnel0 = inter._material->getFresnel();
+					float fresnel = fresnel0 + (1 - fresnel0)*(pow(1 + Dot(ray._direction, inter._nor), 5));		//反射项所占比例
+					vector<float> reflDir = ray._direction - inter._nor * 2 * Dot(ray._direction, inter._nor);
+					float reftRate = inter._material->getReftrectRate();
+					vector<float> reftDir;
+					float co = Dot(ray._direction, inter._nor);
+					float si2 = 1.f - co*co;
+					if (inter._model->inModel(ray._origin))
+					{
+						if (si2 > 1.f / (reftIndex*reftIndex)) break;
+						reftDir = (ray._direction - inter._nor * Dot(ray._direction, inter._nor)) * reftRate - inter._nor*pow(1 - (si2 *reftRate*reftRate), 0.5f);
+					}
+					else
+					{
+						reftDir = (ray._direction - inter._nor * Dot(ray._direction, inter._nor)) / reftRate - inter._nor*pow(1 - si2 / (reftRate*reftRate), 0.5f);
+					}
+
+
+					ray._origin = inter._pos;
+					float pdf = fresnel;
+					mask = mask * inter._material->getColor();
+					if (RandNumber() <= pdf)
+					{
+						ray._direction = Normalize(reflDir);
+						//mask = mask / pdf * fresnel;			//除以是因为重要性采样，乘以是因为基于菲涅尔现象，刚好抵消
+					}
+					else
+					{
+						ray._direction = Normalize(reftDir);
+						//mask = mask / (1.f - pdf) * （1.f - fresnel);
+					}
+				}
+				else if (inter._type == BLIN || inter._type == COOK)
+				{
+					hitSpeculer = false;
+
+					//direct lighting
+					if (!inter._model->IsLight())
+					{
+						size_t light_samples = _lightList->size();		//全光源采样
+						color directColor;
+						for (size_t i = 0; i < light_samples; i++)
+						{
+							vector<float> lightDir;
+							float brdf;
+							float light_pdf;
+							float brdf_pdf;
+							float weight;
+							color lightCol;
+
+							//MIS: light sampling
+							lightCol = _lightList->at(i)->Sample_L(RandNumber(), RandNumber(), inter._pos, &lightDir, &light_pdf);
+							lightDir = Normalize(lightDir);
+							if (light_pdf < 0.f) continue;
+
+							//test visibility
+							Intersection shadowInter = Intersection::_empty;
+							Ray  shadowRay(inter._pos, lightDir);
+							for (auto i = _modelList->begin(); i != _modelList->end(); i++) {
+								Intersection tempInter = (*i)->getIntersection(shadowRay);
+								if (shadowInter._type != EMPTY && tempInter._type != EMPTY && tempInter._t < shadowInter._t) {
+									shadowInter = tempInter;
+								}
+								else if (shadowInter._type == EMPTY && tempInter._type != EMPTY) {
+									shadowInter = tempInter;
+								}
+							}
+							if (shadowInter._model == _lightList->at(i))
+							{
+								vector<float> nor = inter._nor;
+								vector<float> inDir = ray._direction;
+								vector<float> outDir = lightDir;
+								vector<float> H = Normalize(lightDir - ray._direction);
+								brdf = inter._material->CalculateBRDF(nor, inDir, outDir, H);
+
+								brdf_pdf = inter._material->CalculatePDF(nor, inDir, inDir, H);
+								weight = light_pdf * light_pdf / (light_pdf*light_pdf + brdf_pdf * brdf_pdf);
+								directColor = directColor + mask * weight * lightCol * inter._material->getColor()* Dot(lightDir, inter._nor) * brdf / light_pdf;
+							}
+
+							//MIS: brdf sampling
+							float rand1 = RandNumber();
+							float rand2 = RandNumber();
+							lightDir = inter._material->Simple_BRDF(ray._direction, rand1, rand2, inter._nor, &brdf_pdf, &brdf);
+
+							//test visibility
+							shadowInter = Intersection::_empty;
+							shadowRay._direction = lightDir;
+							for (auto i = _modelList->begin(); i != _modelList->end(); i++) {
+
+								Intersection tempInter = (*i)->getIntersection(shadowRay);
+								if (shadowInter._type != EMPTY && tempInter._type != EMPTY && tempInter._t < shadowInter._t) {
+									shadowInter = tempInter;
+								}
+								else if (shadowInter._type == EMPTY && tempInter._type != EMPTY) {
+									shadowInter = tempInter;
+								}
+							}
+							if (shadowInter._model == _lightList->at(i))
+							{
+								light_pdf = _lightList->at(i)->CalculatePdf(inter._pos, inter._t, lightDir);
+								weight = brdf_pdf * brdf_pdf / (light_pdf*light_pdf + brdf_pdf * brdf_pdf);
+								directColor = directColor + mask * weight * lightCol * inter._material->getColor()* Dot(lightDir, inter._nor) * brdf / brdf_pdf;
+							}
+
+						}
+						col = col + directColor / (float)light_samples;
+					}
+
+					//undirect lighting
+					ray._origin = inter._pos;
+					float rand1 = RandNumber();
+					float rand2 = RandNumber();
+					float pdf = 0.f;
+					float brdf = 0.f;
+					vector<float> reflDir = inter._material->Simple_BRDF(ray._direction, rand1, rand2, inter._nor, &pdf, &brdf);
+					ray._direction = reflDir;
+
+					float cosTheta = Dot(inter._nor, ray._direction);
+					mask = mask * inter._material->getColor() * cosTheta * brdf / pdf;
+				}
+				else if (inter._type == DIFFUSE) {		//积分漫反射材质
+					hitSpeculer = false;
+
+					//direct lighting
+					if (!inter._model->IsLight())
+					{
+						size_t light_samples = _lightList->size();		//全光源采样
+						color directColor;
+						for (size_t i = 0; i < light_samples; i++)
+						{
+							vector<float> lightDir;
+							float pdf;
+							color lightCol = _lightList->at(i)->Sample_L(RandNumber(), RandNumber(), inter._pos, &lightDir, &pdf);
+							lightDir = Normalize(lightDir);
+							if (pdf < 0.f) continue;
+
+							//test visibility
+							Intersection shadowInter = Intersection::_empty;
+							Ray  shadowRay(inter._pos, lightDir);
+							for (auto i = _modelList->begin(); i != _modelList->end(); i++) {
+
+								Intersection tempInter = (*i)->getIntersection(shadowRay);
+								if (shadowInter._type != EMPTY && tempInter._type != EMPTY && tempInter._t < shadowInter._t) {
+									shadowInter = tempInter;
+								}
+								else if (shadowInter._type == EMPTY && tempInter._type != EMPTY) {
+									shadowInter = tempInter;
+								}
+							}
+							if (shadowInter._model != _lightList->at(i))
+								continue;
+
+							vector<float> nor = inter._nor;
+							vector<float> inDir = ray._direction;
+							vector<float> outDir = lightDir;
+							vector<float> H = Normalize(lightDir - ray._direction);
+							float brdf = inter._material->CalculateBRDF(nor, inDir, outDir, H);
+							directColor = directColor + mask * lightCol * inter._material->getColor()* Dot(lightDir, inter._nor) * brdf / pdf;
+						}
+						col = col + directColor / (float)light_samples;
+					}
+
+					//undirect lighting
+					ray._origin = inter._pos;
+					float rand1 = RandNumber();
+					float rand2 = RandNumber();
+					float pdf = 0.f;
+					float brdf = 0.f;
+					vector<float> reflDir = inter._material->Simple_BRDF(ray._direction, rand1, rand2, inter._nor, &pdf, &brdf);
+					ray._direction = reflDir;
+
+					float cosTheta = Dot(inter._nor, ray._direction);
+					mask = mask * inter._material->getColor() * cosTheta * brdf / pdf;
+				}
+				else
+				{
+					col = _bgColor * mask + col;
+					break;
+				}
+
+				//俄罗斯轮盘赌
+				color mat_col = inter._material->getColor();
+				float p = Max(mat_col);
+				if (_depth - depth >4)
+					if (RandNumber() < p)
+					{
+						mask = mask / p;
+					}
+					else
+					{
+						break;
+					}
+			}
+			
+#endif
+			return col;
 		};
 	};
 }
-
-#endif

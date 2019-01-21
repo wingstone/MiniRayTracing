@@ -105,12 +105,12 @@ namespace mini
 	}
 
 	//幂运算，用于Gamma校正
-	vector<float> Power(const vector<float> & vec0)
+	vector<float> Power(const vector<float> & vec0, float po)
 	{
 		vector<float> vec;
-		vec._x = std::pow(vec0._x , 1.0f / 2.2);
-		vec._y = std::pow(vec0._y, 1.0f / 2.2);
-		vec._z = std::pow(vec0._z, 1.0f / 2.2);
+		vec._x = std::pow(vec0._x , po);
+		vec._y = std::pow(vec0._y, po);
+		vec._z = std::pow(vec0._z, po);
 
 		return vec;
 	}

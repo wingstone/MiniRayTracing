@@ -6,6 +6,7 @@
 
 #include <cfloat>
 #include <windows.h>
+#include <fstream>
 
 #include "structure.h"
 #include "function.h"
@@ -46,21 +47,87 @@ namespace mini
 		virtual float getReftrectRate(){ return 0; }
 		virtual float getRoughness(){ return 0; }
 		virtual float getReflectionPower() { return 0; }
+
+		//indir is view dir, outdir is light(direct or indirect) dir
+		virtual vector<float> Simple_BRDF(const vector<float>& inDir, const float rand1, const float rand2, const vector<float>& nor, float *pdf, float *brdf)
+		{ return vector<float>(0.f, 0.f, 0.f); }
+		virtual float CalculateBRDF(const vector<float>& nor, const vector<float>& inDir, const vector<float>& outDir, const vector<float>& H)
+		{
+			return 0.f;
+		}
+		virtual float CalculatePDF(const vector<float>& nor, const vector<float>& inDir, const vector<float>& outDir, const vector<float>& H)
+		{
+			return 0.f;
+		}
 	};
 
 	//漫反射材质
 	class DiffuseMaterial : public Material
 	{
 	public:
-		DiffuseMaterial(RefType reftype, color emmision, color materialCol) :Material(reftype), _emmision(emmision), _materialCol(materialCol){}
+		DiffuseMaterial(RefType reftype, color emmision, color materialCol) :Material(reftype), _emmision(emmision), _materialCol(materialCol)
+		{
+			useCosSample = false;
+		}
 		~DiffuseMaterial(){}
 
 		virtual color getColor(){ return _materialCol; }
 		virtual color getEmmision(){ return _emmision; }
+		virtual vector<float> Simple_BRDF(const vector<float>& inDir, const float rand1, const float rand2, const vector<float>& nor, float *pdf, float *brdf)
+		{
+			vector<float> w = nor;
+			w = Normalize(w);
+			vector<float> u = w._z <= 0.5f ? Cross(vector<float>(0.f, 0.f, 1.f), w) : Cross(vector<float>(0.f, 1.f, 0.f), w);
+			u = Normalize(u);
+			vector<float> v = Cross(w, u);
+			v = Normalize(v);
+
+
+			vector<float> dir;
+			if (!useCosSample)
+			{
+				//半球采样 
+				float cosTheta = rand1;
+				float sinTheta = sqrt(1 - cosTheta * cosTheta);
+				float phi = 2.f * PI*rand2;
+				dir = u * sinTheta*cos(phi) + v * sinTheta* sin(phi) + w * cosTheta;
+				*pdf = 1.f / (2.f*PI);
+			}
+			else
+			{
+				//余弦采样
+				float redius = sqrt(rand1);
+				float sinTheta = redius;
+				float cosTheta = sqrt(1 - rand1);
+				float phi = 2 * PI*rand2;
+				dir = u * sinTheta*cos(phi) + v * sinTheta* sin(phi) + w * cosTheta;
+				*pdf = cosTheta / PI;
+			}
+
+			*brdf = 1.f / PI;
+			return dir;
+		}
+		virtual float CalculateBRDF(const vector<float>& nor, const vector<float>& inDir, const vector<float>& outDir, const vector<float>& H)
+		{
+			return 1.f / PI;
+		}
+		virtual float CalculatePDF(const vector<float>& nor, const vector<float>& inDir, const vector<float>& outDir, const vector<float>& H)
+		{
+			if (!useCosSample)
+			{
+				return 1.f / (2.f*PI);
+			}
+			else
+			{
+				float cosTheta = Dot(outDir, nor);
+				return cosTheta / PI;
+			}
+		}
 
 	private:
 		color _emmision;
 		color _materialCol;
+		bool useCosSample;
 	};
 
 	//镜面反射材质
@@ -106,6 +173,70 @@ namespace mini
 		virtual float getFresnel(){ return _fresnel; }
 		virtual color getEmmision(){ return _emission; }
 		virtual float getRoughness(){ return _roughness; }
+		virtual vector<float> Simple_BRDF(const vector<float>& inDir, const float rand1, const float rand2, const vector<float>& nor, float *pdf, float *brdf)
+		{
+			vector<float> w = nor;
+			w = Normalize(w);
+			vector<float> u = w._z <= 0.5f ? Cross(vector<float>(0.f, 0.f, 1.f), w) : Cross(vector<float>(0.f, 1.f, 0.f), w);
+			u = Normalize(u);
+			vector<float> v = Cross(w, u);
+			v = Normalize(v);
+
+			//use isotropic Beckmann distribution
+			float logSimple = rand1 == 0 ? 0 : log(rand1);
+			float tan2ThetaH = -_roughness * _roughness*logSimple;
+			float cosThetaH = 1.f / sqrt(1 + tan2ThetaH);
+			float sinThetaH = sqrt(1 - cosThetaH * cosThetaH);
+			float phi = 2.f * PI*rand2;
+			vector<float> H = u * sinThetaH*cos(phi) + v * sinThetaH* sin(phi) + w * cosThetaH;
+			
+			vector<float> dir = inDir - H * Dot(inDir, H) * 2.f;
+
+			float roughness2 = _roughness * _roughness;
+			float D = exp(-tan2ThetaH / roughness2) / (PI*roughness2* pow(cosThetaH, 4.f));		//there are more different distribution models in pbrt
+
+			float g1 = 2 * Dot(H, nor)*Dot(nor, -inDir) / Dot(-inDir, H);
+			float g2 = 2 * Dot(H, nor)*Dot(nor, dir) / Dot(-inDir, H);
+			float G = g1 < g2 ? g1 : g2;																									//there are more different masking models in pbrt
+			G = 1 < g1 ? 1 : g1;
+			G = G < 0 ? 0 : G;
+
+			float fresnel = _fresnel + (1 - _fresnel)*(pow(1 + Dot(inDir, nor), 5));		//反射项所占比例
+			*brdf = D * G*fresnel / (4.f*Dot(-inDir, nor)*Dot(nor, dir));
+
+			*pdf = D * cosThetaH / (4.f* Dot(dir, H));
+
+			if (Dot(dir, nor) < 0.f) *pdf = -1.f;
+
+			return dir;
+		}
+		virtual float CalculateBRDF(const vector<float>& nor, const vector<float>& inDir, const vector<float>& outDir, const vector<float>& H)
+		{
+			float roughness2 = _roughness * _roughness;
+			float cosThetaH = Dot(H, nor);
+			float cosThetaH2 = cosThetaH * cosThetaH;
+			float tan2ThetaH = (1.f - cosThetaH2) / cosThetaH2;
+			float D = exp(-tan2ThetaH / roughness2) / (PI*roughness2* pow(cosThetaH, 4.f));		//there are more different distribution models in pbrt
+
+			float g1 = 2 * Dot(H, nor)*Dot(nor, -inDir) / Dot(-inDir, H);
+			float g2 = 2 * Dot(H, nor)*Dot(nor, outDir) / Dot(-inDir, H);
+			float G = g1 < g2 ? g1 : g2;																									//there are more different masking models in pbrt
+			G = 1 < g1 ? 1 : g1;
+			G = G < 0 ? 0 : G;
+
+			float fresnel = _fresnel + (1 - _fresnel)*(pow(1 + Dot(inDir, nor), 5));		//反射项所占比例
+			return D * G*fresnel / (4.f*Dot(-inDir, nor)*Dot(nor, outDir));
+		}
+		virtual float CalculatePDF(const vector<float>& nor, const vector<float>& inDir, const vector<float>& outDir, const vector<float>& H)
+		{
+			float roughness2 = _roughness * _roughness;
+			float cosThetaH = Dot(H, nor);
+			float cosThetaH2 = cosThetaH * cosThetaH;
+			float tan2ThetaH = (1.f - cosThetaH2) / cosThetaH2;
+			float D = exp(-tan2ThetaH / roughness2) / (PI*roughness2* pow(cosThetaH, 4.f));
+
+			return  D * cosThetaH / (4.f* Dot(outDir, H));
+		}
 
 	private:
 		color _emission;
@@ -115,7 +246,7 @@ namespace mini
 	};
 
 	//使用Blin选项的微表面材质	//早期发现的材质，比较常用，因为易计算
-	class BlinMaterial : public Material		//diffuse+mirror
+	class BlinMaterial : public Material
 	{
 	public:
 		BlinMaterial(RefType reftype, color emission, color materialCol, float fresnel, float reflectionPower)
@@ -126,6 +257,41 @@ namespace mini
 		virtual color getEmmision() { return _emission; }
 		virtual float getFresnel() { return _fresnel; }
 		virtual float getReflectionPower(){ return _reflectionPower; }
+		virtual vector<float> Simple_BRDF(const vector<float>& inDir, const float rand1, const float rand2, const vector<float>& nor, float *pdf, float *brdf)
+		{
+			
+			float phi = 2.f*PI*rand1;
+			float cosThetaH = pow(rand2, 1.f/(_reflectionPower + 1.f));
+			float sinThetaH = sqrt(1.f - cosThetaH * cosThetaH);
+
+			vector<float> w = nor;
+			w = Normalize(w);
+			vector<float> u = w._z <= 0.5f ? Cross(vector<float>(0.f, 0.f, 1.f), w) : Cross(vector<float>(0.f, 1.f, 0.f), w);
+			u = Normalize(u);
+			vector<float> v = Cross(w, u);
+			v = Normalize(v);
+
+			vector<float> H = u * sinThetaH*cos(phi) + v * sinThetaH* sin(phi) + w * cosThetaH;
+
+			*brdf = (_reflectionPower + 2.f)*pow(Dot(H, nor), _reflectionPower) / (2.f*PI);
+
+			vector<float> dir = inDir - H * Dot(inDir, H) * 2.f;
+
+			*pdf = (_reflectionPower + 1.f) * pow(cosThetaH, _reflectionPower) / (2.f * PI * 4.f * Dot(dir, H));
+
+			if (Dot(dir, nor) < 0.f) *pdf = -1.f;
+
+			return dir;
+		}
+		virtual float CalculateBRDF(const vector<float>& nor, const vector<float>& inDir, const vector<float>& outDir, const vector<float>& H)
+		{
+			return (_reflectionPower + 2.f)*pow(Dot(H, nor), _reflectionPower) / (2.f*PI);
+		}
+		virtual float CalculatePDF(const vector<float>& nor, const vector<float>& inDir, const vector<float>& outDir, const vector<float>& H)
+		{
+			float cosThetaH = Dot(H, nor);
+			return  (_reflectionPower + 1.f) * pow(cosThetaH, _reflectionPower) / (2.f * PI * 4.f * Dot(outDir, H));
+		}
 
 	private:
 		color _emission;
@@ -137,8 +303,10 @@ namespace mini
 	//=========================================
 	//model、light
 
+	//前置声明
+	class Model;
+
 	//Intersection class
-	class Model;	//提前声明
 	struct Intersection
 	{
 		point _pos;
@@ -154,7 +322,7 @@ namespace mini
 	};
 	const Intersection Intersection::_empty = Intersection(point(), normal(), 0, EMPTY, NULL, NULL);
 
-	//Model base class
+	//Model and light base class
 	class Model
 	{
 	public:
@@ -164,20 +332,10 @@ namespace mini
 		//virtual bool intersectAndSetT(Ray ray) = 0;
 		virtual bool inModel(point po) = 0;
 		virtual Intersection getIntersection(Ray ray) = 0;
-
-	};
-
-	//light base class
-	class Light
-	{
-	public:
-		Light() {};
-		~Light() {};
-
 		//rand范围：0~1
-		virtual color Sample_L(float rand1, float rand2, point rayOrigin, vector<float> *lightRay, float* pdf) = 0;
-		virtual float CalculatePdf(Ray& ray) = 0;
-		virtual float GetArea() = 0;
+		virtual color Sample_L(float rand1, float rand2, point rayOrigin, vector<float> *lightRay, float* pdf) { return color(); };
+		virtual float CalculatePdf(const point& lightOrigin, float t, const vector<float>& lightDir) { return -1.f; };
+		virtual float GetArea() { return 0; };
 		virtual bool IsLight()
 		{
 			return false;
@@ -210,13 +368,13 @@ namespace mini
 			point po;
 			if (_material->_reftype == TRANSP && this->inModel(ray._origin))
 			{
-				_t = pro + pow(_redius*_redius - inLenSquare, 0.5);
+				_t = pro + pow(_redius*_redius - inLenSquare, 0.5f);
 				po = ray._origin + ray._direction*_t;
 				_normal = Normalize(_center - po);
 			}
 			else
 			{
-				_t = pro - pow(_redius*_redius - inLenSquare, 0.5);
+				_t = pro - pow(_redius*_redius - inLenSquare, 0.5f);
 				po = ray._origin + ray._direction*_t;
 				_normal = Normalize(po - _center);
 			}
@@ -237,15 +395,15 @@ namespace mini
 	};
 
 	//Disk_light
-	class Disk : public Model,public Light
+	class Disk_Light : public Model
 	{
 	public:
-		Disk(point center, float redius, vector<float> direction, bool islight, Material*  material)
+		Disk_Light(point center, float redius, vector<float> direction, bool islight, Material*  material)
 			:_center(center), _redius(redius), _isLight(islight), _material(material) 
 		{
 			_direction = Normalize(direction);
 		}
-		~Disk() {};
+		~Disk_Light() {};
 
 		bool inModel(point po) {
 			return false;
@@ -273,7 +431,7 @@ namespace mini
 			return _isLight;
 		}
 
-		color Sample_L(float rand1, float rand2, point rayOrigin, vector<float> *lightRay, float* pdf)
+		virtual color Sample_L(float rand1, float rand2, point rayOrigin, vector<float> *lightRay, float* pdf)
 		{
 			vector<float> u, v;
 			if (_direction._x == 0) u = Normalize(Cross(vector<float>(1, 0, 0), _direction));
@@ -286,21 +444,17 @@ namespace mini
 
 			*lightRay = pos - rayOrigin;
 			 vector<float> dir = Normalize(*lightRay);
-			 if (Dot(-dir, _direction) == 0)
-				 *pdf = 0.f;
+			 if (Dot(-dir, _direction) <= 0)		//面光源具有方向性
+				 *pdf = -1.f;
 			 else
 				 *pdf = Dot(*lightRay, *lightRay) /( GetArea()*Dot(-dir, _direction));
 
 			 return _material->getEmmision();
 		}
 
-		float CalculatePdf(Ray& ray)
+		virtual float CalculatePdf(const point& lightOrigin, float t, const vector<float>& lightDir)
 		{
-			Intersection inter = getIntersection(ray);
-			if (inter._type == EMPTY)
-				return 0.f;
-			else
-				return  inter._t*inter._t / (GetArea()*Dot(-ray._direction, _direction));
+				return  t*t / (GetArea()*Dot(-lightDir, _direction));
 		}
 
 		float GetArea()
@@ -318,7 +472,7 @@ namespace mini
 	};
 
 	//Sphere_light
-	class Sphere_Light : public Sphere, public Light
+	class Sphere_Light : public Sphere
 	{
 	public:
 		Sphere_Light(point center, float redius,  bool islight, Material*  material)
@@ -327,36 +481,39 @@ namespace mini
 		}
 		~Sphere_Light() {};
 
-		//light
-
 		bool IsLight()
 		{
 			return _isLight;
 		}
 
-		color Sample_L(float rand1, float rand2, point rayOrigin, vector<float> *lightRay, float* pdf)
+		virtual color Sample_L(float rand1, float rand2, point rayOrigin, vector<float> *lightRay, float* pdf)
 		{
 			vector<float> u, v, w;
-			u = vector<float>(1, 0, 0);
-			v = vector<float>(0, 0, 1);
-			w = vector<float>(0, 1, 0);
+			w = Normalize(_center - rayOrigin);
+			u = w._z <= 0.5f ? Cross(vector<float>(0.f, 0.f, 1.f), w) : Cross(vector<float>(0.f, 1.f, 0.f), w);
+			u = Normalize(u);
+			v = Cross(w, u);
+			v = Normalize(v);
 
-			float phi = rand2 * 2 * PI;		//phi进行分层采样
-			float z = 1.f - 2.f*rand1;
-			float x = std::cos(phi)*2.f*std::sqrt(1.f - rand1 * rand1);
-			float y = std::sin(phi)*2.f*std::sqrt(1.f - rand1 * rand1);
+			//针对球体对应的体积角进行采样
+			float phi = rand2 * 2.f * PI;		//phi进行分层采样
+			float sinThetaMax = _redius / Distance(rayOrigin, _center);
+			float cosThetaMin = sqrt(1.f - sinThetaMax * sinThetaMax);
+			float z = 1.f - (1.f - cosThetaMin)*rand1;
+			float x = std::cos(phi)*std::sqrt(1.f - z * z);
+			float y = std::sin(phi)*std::sqrt(1.f - z * z);
 
-			vector<float> nor = u * x + v * y + w * z;
-			point pos = _center + nor *_redius;
-
-			*lightRay = pos - rayOrigin;
-			vector<float> dir = Normalize(*lightRay);
-			if (Dot(dir, nor) == 0)
-				*pdf = 0.f;
-			else
-				*pdf = Dot(*lightRay, *lightRay) / (GetArea()*Dot(dir, nor));
+			*lightRay = u * x + v * y + w * z;
+			*pdf = 1.f / (2.f * PI * (1.f - cosThetaMin));
 
 			return _material->getEmmision();
+		}
+
+		virtual float CalculatePdf(const point& lightOrigin, float t, const vector<float>& lightDir) 
+		{
+			float sinThetaMax = _redius / Distance(lightOrigin, _center);
+			float cosThetaMin = sqrt(1.f - sinThetaMax * sinThetaMax);
+			return 1.f / (2.f * PI * (1.f - cosThetaMin));
 		}
 
 		float CalculatePdf(Ray& ray)

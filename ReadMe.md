@@ -31,8 +31,8 @@
  - **Tracing Stop Method:**Russian roulette;
 
 ###HOW TO USE
-&emsp;&emsp;Run platform is Windows, and there are some **scene files** in the **SceneFile file folder**. You can just run cmdline "mini.exe [file name]" on the "CMD" or "PowerShell" to get the Render Scene. 
+&emsp;&emsp;Run platform is Windows, and there are some **scene files** in the **SceneFile file folder**. You can just run cmdline "miniRT.exe [file name]" on the "CMD" or "PowerShell" to get the Render Scene. 
 
-&emsp;&emsp;For Emample, **run** "mini.exe Scene_CurnellBox.rt", then enter **spp:**"4" and **Depth:** "5", you will get follow result.
+&emsp;&emsp;For Emample, **run** "mini.exe Scene_CurnellBox.rt", then enter **spp:**"100" and **Depth:** "4", you will get follow result.
 
 ![](SceneFile/CurnallBox.bmp)

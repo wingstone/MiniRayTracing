@@ -28,7 +28,7 @@ namespace mini
 			vector vecr(_x - vec._x, _y - vec._y, _z - vec._z);
 			return vecr;
 		}
-		vector operator-()
+		vector operator-() const
 		{
 			return vector(-_x, -_y, -_z);
 		}
