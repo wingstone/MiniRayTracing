@@ -40,7 +40,7 @@ int main(int argc, char* argv[])
 #ifndef _DEBUG
 		scene->initFromFile(argv[1]);
 #else
-		scene->initFromFile("Scene_GGX.rt");
+		scene->initFromFile("Scene_OrenNayer.rt");
 #endif // !_DEBUG
 		scene->renderAndWrite("RayTracing.bmp");
 		delete scene;

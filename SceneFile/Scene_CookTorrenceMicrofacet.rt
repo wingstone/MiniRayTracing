@@ -1,7 +1,7 @@
 //区分大小写 右手坐标系
 Material{
 	DiffuseMaterial{	//0
-		RefType:DIFFUSE; Emmision:13,13,13; Color:1,1,1;	//light
+		RefType:DIFFUSE; Emmision:7,7,7; Color:1,1,1;	//light
 	}
 	DiffuseMaterial{	//1
 		RefType:DIFFUSE; Emmision:0,0,0; Color:0,0,0;			//black
