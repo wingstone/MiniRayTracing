@@ -18,8 +18,7 @@ namespace mini
 	{
 		DIFFUSE,
 		MIRROR, TRANSP,		//Alpha distribution
-		GGX,
-		REFLECTION, EMPTY		
+		BLIN, COOK, EMPTY		
 	};
 
 	//Ray struct
@@ -59,13 +58,6 @@ namespace mini
 		virtual float CalculatePDF(const vector<float>& nor, const vector<float>& inDir, const vector<float>& outDir, const vector<float>& H)
 		{
 			return 0.f;
-		}
-
-		//main for ggx
-		virtual void Simple_BSDF(const vector<float>& inDir, const float rand1, const float rand2, const vector<float>& nor,
-			float *pdf_r, float *brdf, float *pdf_t, float *btdf, float *fresnel,
-			vector<float> *rdir, vector<float> *tdir)
-		{
 		}
 	};
 
@@ -389,158 +381,6 @@ namespace mini
 		color _materialCol;
 		float _fresnel;
 		float _reflectionPower;
-	};
-
-	// http://120.52.51.13/www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf
-	class GGXMaterial : public Material
-	{
-	public:
-		GGXMaterial(RefType type, color emission, color matCol, float fresnel, float roughness, float reftIndex)
-			:Material(type), _emission(emission), _materialCol(matCol), _fresnel(fresnel), _roughness(roughness), _reftIndex(reftIndex){};
-		~GGXMaterial() {};
-
-		virtual color getColor() { return _materialCol; }
-		virtual float getFresnel() { return _fresnel; }
-		virtual color getEmmision() { return _emission; }
-		virtual float getRoughness() { return _roughness; }
-		virtual vector<float> Simple_BRDF(const vector<float>& inDir, const float rand1, const float rand2, const vector<float>& nor, float *pdf, float *brdf)
-		{
-			vector<float> w = nor;
-			w = Normalize(w);
-			vector<float> u = w._z <= 0.5f ? Cross(vector<float>(0.f, 0.f, 1.f), w) : Cross(vector<float>(0.f, 1.f, 0.f), w);
-			u = Normalize(u);
-			vector<float> v = Cross(w, u);
-			v = Normalize(v);
-
-			//use GGX distribution
-			float tan2ThetaH = _roughness * _roughness*rand1 / (1.f - rand1);
-			float cosThetaH = 1.f / sqrt(1 + tan2ThetaH);
-			float sinThetaH = sqrt(1 - cosThetaH * cosThetaH);
-			float phi = 2.f * PI*rand2;
-			vector<float> H = u * sinThetaH*cos(phi) + v * sinThetaH* sin(phi) + w * cosThetaH;
-
-			vector<float> dir = inDir - H * Dot(inDir, H) * 2.f;
-
-			float roughness2 = _roughness * _roughness;
-			float D = roughness2 / (PI* pow(cosThetaH, 4.f)*(roughness2 + tan2ThetaH));
-
-			float cosThetaIn2 = Dot(dir, nor)*Dot(dir, nor);
-			float cosThetaOut2 = Dot(-inDir, nor)*Dot(-inDir, nor);
-			float tan2ThetaIn = (1.f - cosThetaIn2) / cosThetaIn2;
-			float tan2ThetaOut = (1.f - cosThetaOut2) / cosThetaOut2;
-
-			float GIn = 2.f / (1.f + sqrt(1.f + roughness2 * tan2ThetaIn));
-			float GOut = 2.f / (1.f + sqrt(1.f + roughness2 * tan2ThetaOut));
-			float G = GIn * GOut;
-
-			float fresnel = _fresnel + (1 - _fresnel)*(pow(1 + Dot(inDir, nor), 5));		//反射项所占比例
-			*brdf = D * G*fresnel / (4.f*Dot(-inDir, nor)*Dot(nor, dir));
-
-			*pdf = D * cosThetaH / (4.f* Dot(dir, H));
-
-			if (Dot(dir, nor) < 0.f) *pdf = -1.f;
-
-			return dir;
-		}
-		virtual float CalculateBRDF(const vector<float>& nor, const vector<float>& inDir, const vector<float>& outDir, const vector<float>& H)
-		{
-			float roughness2 = _roughness * _roughness;
-			float cosThetaH = Dot(H, nor);
-			float cosThetaH2 = cosThetaH * cosThetaH;
-			float tan2ThetaH = (1.f - cosThetaH2) / cosThetaH2;
-			float D = roughness2 / (PI* pow(cosThetaH, 4.f)*(roughness2 + tan2ThetaH));	
-
-			float cosThetaIn2 = Dot(outDir, nor)*Dot(outDir, nor);
-			float cosThetaOut2 = Dot(-inDir, nor)*Dot(-inDir, nor);
-			float tan2ThetaIn = (1.f - cosThetaIn2) / cosThetaIn2;
-			float tan2ThetaOut = (1.f - cosThetaOut2) / cosThetaOut2;
-
-			float GIn = 2.f / (1.f + sqrt(1.f + roughness2 * tan2ThetaIn));
-			float GOut = 2.f / (1.f + sqrt(1.f + roughness2 * tan2ThetaOut));
-			float G = GIn * GOut;
-
-			float fresnel = _fresnel + (1 - _fresnel)*(pow(1 + Dot(inDir, nor), 5));		//反射项所占比例
-			return D * G*fresnel / (4.f*Dot(-inDir, nor)*Dot(nor, outDir));
-		}
-		virtual float CalculatePDF(const vector<float>& nor, const vector<float>& inDir, const vector<float>& outDir, const vector<float>& H)
-		{
-			float roughness2 = _roughness * _roughness;
-			float cosThetaH = Dot(H, nor);
-			float cosThetaH2 = cosThetaH * cosThetaH;
-			float tan2ThetaH = (1.f - cosThetaH2) / cosThetaH2;
-			float D = roughness2 / (PI* pow(cosThetaH, 4.f)*(roughness2 + tan2ThetaH));
-
-			return  D * cosThetaH / (4.f* Dot(outDir, H));
-		}
-
-		virtual void Simple_BSDF(const vector<float>& inDir, const float rand1, const float rand2, const vector<float>& nor,
-			float *pdf_r, float *brdf, float *pdf_t, float *btdf, float *fresnel,
-			vector<float> *rdir, vector<float> *tdir)
-		{
-			vector<float> w = nor;
-			w = Normalize(w);
-			vector<float> u = w._z <= 0.5f ? Cross(vector<float>(0.f, 0.f, 1.f), w) : Cross(vector<float>(0.f, 1.f, 0.f), w);
-			u = Normalize(u);
-			vector<float> v = Cross(w, u);
-			v = Normalize(v);
-
-			//use GGX distribution
-			//reflection
-			float tan2ThetaH = _roughness * _roughness*rand1/(1.f-rand1);
-			float cosThetaH = 1.f / sqrt(1 + tan2ThetaH);
-			float sinThetaH = sqrt(1 - cosThetaH * cosThetaH);
-			float phi = 2.f * PI*rand2;
-			vector<float> H = u * sinThetaH*cos(phi) + v * sinThetaH* sin(phi) + w * cosThetaH;
-
-			*rdir = inDir - H * Dot(inDir, H) * 2.f;
-
-			float roughness2 = _roughness * _roughness;
-			float D = roughness2 / (PI* pow(cosThetaH, 4.f)*(roughness2 + tan2ThetaH));
-
-			float cosThetaIn2 = Dot(*rdir, nor)*Dot(*rdir, nor);
-			float cosThetaOut2 = Dot(-inDir, nor)*Dot(-inDir, nor);
-			float tan2ThetaIn = (1.f - cosThetaIn2) / cosThetaIn2;
-			float tan2ThetaOut = (1.f - cosThetaOut2) / cosThetaOut2;
-
-			float GIn = 2.f / (1.f + sqrt(1.f + roughness2 * tan2ThetaIn));
-			float GOut = 2.f / (1.f + sqrt(1.f + roughness2 * tan2ThetaOut));
-			float G = GIn * GOut;
-
-			*fresnel = _fresnel + (1 - _fresnel)*(pow(1 + Dot(inDir, nor), 5));		//反射项所占比例
-			*brdf = D * G*(*fresnel) / (4.f*Dot(-inDir, nor)*Dot(nor, *rdir));
-
-			*pdf_r = D * cosThetaH / (4.f* Dot(*rdir, H));
-
-			//refraction
-			float co = Dot(inDir, H);
-			float si2 = 1.f - co * co;
-			if(Dot(H, inDir) <= 0)
-			{
-
-				*tdir = (inDir - H * Dot(inDir, H)) / _reftIndex - H *pow(1 - si2 / (_reftIndex*_reftIndex), 0.5f);
-			}
-			else
-			{
-				if (si2 > 1.f / (_reftIndex*_reftIndex)) ;
-				*tdir = (inDir - H * Dot(inDir, H)) * _reftIndex - H*pow(1 - (si2 *_reftIndex*_reftIndex), 0.5f);
-			}
-
-			float factor = abs(Dot(*tdir, H)*Dot(-inDir, H) / (Dot(*tdir, nor)*Dot(-inDir, nor)));
-			*btdf = factor * (1.f - (*fresnel))*G*D / pow(_reftIndex*Dot(*tdir, H) + Dot(-inDir, H), 2);
-
-			float eta = Dot(H, inDir) <= 0 ? 1.f/_reftIndex : _reftIndex;
-			float sqrtDenom = Dot(*rdir, H) + eta * Dot(-inDir, H);
-			float dwh_dwi =
-				std::abs((eta * eta * Dot(-inDir, H)) / (sqrtDenom * sqrtDenom));
-			*pdf_t = D * cosThetaH * dwh_dwi;
-		}
-
-	private:
-		color _emission;
-		color _materialCol;
-		float _fresnel;
-		float _roughness;
-		float _reftIndex;
 	};
 
 	//=========================================
@@ -989,30 +829,15 @@ namespace mini
 		//在面的负法线方向上一侧
 		bool inModel(point po)
 		{
-			return Dot(_normal, _po1 - po) >= -DELTA;
+			return Dot(_normal, _po1 - po) > 0;
 		}
 
 		Intersection getIntersection(Ray ray)
 		{
-			normal nor =  Dot(ray._direction, _normal) > 0 ? -_normal :_normal;
+			normal nor = Dot(ray._direction, _normal) > 0 ? -_normal : _normal;
 			float t = -(_d + Dot(_normal, ray._origin)) / Dot(_normal, ray._direction);
-			if (t < 0.f) 
+			if (t <= 0.f) 
 				return Intersection::_empty;
-			else if (_material->_reftype == TRANSP || _material->_reftype == GGX)		//处理折射
-			{
-				if (!inModel(ray._origin))
-				{
-					point po = ray._origin + ray._direction*t;
-					vector<float> v1 = Normalize(_po1 - po);
-					vector<float> v2 = Normalize(_po2 - po);
-					vector<float> v3 = Normalize(_po3 - po);
-					vector<float> v4 = Normalize(_po4 - po);
-					if (acos(Dot(v1, v2)) + acos(Dot(v2, v3)) + acos(Dot(v3, v4)) + acos(Dot(v4, v1)) > 2 * PI - DELTA)			//根据夹角相加是否等于2PI来判断是否在多边形内部
-						return Intersection(ray._origin + ray._direction*t, nor, t - DELTA * 0.5f, _material->_reftype, _material, this);
-					else
-						return Intersection::_empty;
-				}
-			}
 			else
 			{
 				point po = ray._origin + ray._direction*t;

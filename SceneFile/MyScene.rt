@@ -12,7 +12,7 @@ Material{
 	DiffuseMaterial{	//3
 		RefType:DIFFUSE; Emmision:0,0,0; Color:1,1,1;			//White
 	}
-	MirrorMaterial{	//4
+	ReflectMaterial{	//4
 		RefType:MIRROR; Color:1,1,1;		//Mirror
 	}
 	TranspMaterial{	//5
