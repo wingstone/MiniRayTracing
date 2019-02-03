@@ -43,7 +43,7 @@ Model{
 	}
 }
 Light{
-	Disk_Light{	//6 light
+	Disk{	//6 light
 		Center:0.0, 4.99, 0.0; Redius:2.5; Normal:0.0, -1.0, 0.0; Material: 0;
 	}
 }

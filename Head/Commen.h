@@ -486,9 +486,6 @@ namespace mini{
 							float screenX = ( (s1 + r1) / float(sqrt_spp) + i + x*sub_wid) / _width;
 							float screenY = ( (s1 + r2) / float(sqrt_spp) + j + y*sub_hei) / _height;
 
-							if (screenX > 0.3f && screenY > 0.5f)
-								float p = 0.f;
-
 							Ray ray = _camera->getRay(screenX, screenY, r1, r2);
 							col = col + rayTrace(ray, _depth);
 						}
@@ -810,7 +807,6 @@ namespace mini{
 							vector<float> H = Normalize(lightDir - ray._direction);
 							float brdf = inter._material->CalculateBRDF(nor, inDir, outDir, H);
 							directColor = directColor + mask * lightCol * inter._material->getColor()* Dot(lightDir, inter._nor) * brdf / pdf;
-							float n = 0.f;
 						}
 						col = col + directColor / (float)light_samples;
 					}
