@@ -379,12 +379,12 @@ namespace mini
 				_normal = Normalize(po - _center);
 			}
 
-			if (_t <= 0.f){
+			if (_t < DELTA){
 				return Intersection::_empty;
 			}
 			else
 			{
-				return Intersection(ray._origin + ray._direction*_t, _normal, _t-DELTA*0.5f, _material->_reftype, _material, this);
+				return Intersection(ray._origin + ray._direction*_t, _normal, _t, _material->_reftype, _material, this);
 			}
 		}
 
@@ -417,11 +417,11 @@ namespace mini
 			float d = -Dot(_center, _direction);
 
 			float t = -(d + Dot(_direction, ray._origin)) / Dot(_direction, ray._direction);
-			if (t <= 0.f)
+			if (t < DELTA)
 				return Intersection::_empty;
 
 			point interPoint = ray._origin + ray._direction*t;
-			return Length(interPoint - _center) > _redius + DELTA ? Intersection::_empty : Intersection(interPoint, _direction, t - DELTA*0.5f, _material->_reftype, _material, this);
+			return Length(interPoint - _center) > _redius + DELTA ? Intersection::_empty : Intersection(interPoint, _direction, t, _material->_reftype, _material, this);
 		}
 
 		//light
@@ -516,6 +516,18 @@ namespace mini
 			return 1.f / (2.f * PI * (1.f - cosThetaMin));
 		}
 
+		float CalculatePdf(Ray& ray)
+		{
+			Intersection inter = getIntersection(ray);
+			if (inter._type == EMPTY)
+				return 0.f;
+			else
+			{
+				vector<float> nor = Normalize(inter._pos - _center);
+				return  inter._t*inter._t / (GetArea()*Dot(-ray._direction, nor));
+			}
+		}
+
 		float GetArea()
 		{
 			return PI * _redius*_redius * 4.f;
@@ -534,7 +546,7 @@ namespace mini
 		bool inModel(point po)
 		{
 			return abs(po._x - _min._x + _max._x - po._x) + abs(po._y - _min._y + _max._y - po._y) + abs(po._z - _min._z + _max._z - po._z)
-				< _max._x - _min._x + _max._y - _min._y + _max._z - _min._z + DELTA*0.5f;
+				< _max._x - _min._x + _max._y - _min._y + _max._z - _min._z + DELTA;
 		}
 
 		Intersection getIntersection(Ray ray)
@@ -608,12 +620,12 @@ namespace mini
 				InterAssist(tx1, tx2, ty1, ty2, tz1, tz2, &t, &nor, ray._origin);
 			}
 
-			if (t <= 0.f){
+			if (t < DELTA){
 				return Intersection::_empty;
 			}
 			else
 			{
-				return Intersection(ray._origin + ray._direction*t, nor, t - DELTA*0.5f, _material->_reftype, _material, this);
+				return Intersection(ray._origin + ray._direction*t, nor, t, _material->_reftype, _material, this);
 			}
 		}
 
@@ -722,8 +734,9 @@ namespace mini
 
 		Intersection getIntersection(Ray ray)
 		{
+			normal nor = Dot(ray._direction, _normal) > 0 ? -_normal : _normal;
 			float t = -(_d + Dot(_normal, ray._origin)) / Dot(_normal, ray._direction);
-			return t <= 0.f ? Intersection::_empty : Intersection(ray._origin + ray._direction*t, _normal, t-DELTA*0.5f, _material->_reftype, _material, this);
+			return t < DELTA ? Intersection::_empty : Intersection(ray._origin + ray._direction*t, nor, t, _material->_reftype, _material, this);
 		}
 
 	private:
@@ -753,7 +766,7 @@ namespace mini
 		{
 			normal nor = Dot(ray._direction, _normal) > 0 ? -_normal : _normal;
 			float t = -(_d + Dot(_normal, ray._origin)) / Dot(_normal, ray._direction);
-			if (t <= 0.f) 
+			if (t < DELTA) 
 				return Intersection::_empty;
 			else
 			{
@@ -763,7 +776,7 @@ namespace mini
 				vector<float> v3 = Normalize(_po3 - po);
 				vector<float> v4 =Normalize( _po4 - po);
 				if (acos(Dot(v1,v2)) + acos(Dot(v2,v3))+acos(Dot(v3,v4))+acos(Dot(v4,v1)) > 2*PI- DELTA)			//根据夹角相加是否等于2PI来判断是否在多边形内部
-					return Intersection(ray._origin + ray._direction*t, nor, t - DELTA*0.5f, _material->_reftype, _material, this);
+					return Intersection(ray._origin + ray._direction*t, nor, t, _material->_reftype, _material, this);
 				else
 					return Intersection::_empty;
 			}
@@ -811,7 +824,7 @@ namespace mini
 			if (beta + gamma <= 1 && beta >= 0 && gamma >= 0)
 			{
 				normal nor = Dot(ray._direction, _normal) > 0 ? -_normal : _normal;
-				return t <= 0.f ? Intersection::_empty : Intersection(ray._origin + ray._direction*t, nor, t - DELTA*0.5f, _material->_reftype, _material, this);
+				return t < DELTA ? Intersection::_empty : Intersection(ray._origin + ray._direction*t, nor, t, _material->_reftype, _material, this);
 			}
 			else
 			{
