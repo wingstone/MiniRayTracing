@@ -40,7 +40,7 @@ int main(int argc, char* argv[])
 #ifndef _DEBUG
 		scene->initFromFile(argv[1]);
 #else
-		scene->initFromFile("MyScene.rt");
+		scene->initFromFile("Scene_CurnellBox.rt");
 #endif // !_DEBUG
 		scene->renderAndWrite("RayTracing.bmp");
 		delete scene;
@@ -50,5 +50,7 @@ int main(int argc, char* argv[])
 	}
 	
 	system("pause");
+
+	_CrtDumpMemoryLeaks();
 	return 0;
 }
