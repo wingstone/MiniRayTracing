@@ -315,7 +315,7 @@ namespace mini{
 
 					_materialList.push_back(new OrenNayerMaterial(DIFFUSE, emmision, matCol, roughness));
 				}
-				else if (str.compare("ReflectMaterial") == 0)
+				else if (str.compare("MirrorMaterial") == 0)
 				{
 					color matCol;
 					matCol = getNextVector(sstream);
@@ -338,7 +338,7 @@ namespace mini{
 					matcol = getNextVector(sstream);
 					fresnel = getNextNumber(sstream);
 					roughness = getNextNumber(sstream);
-					_materialList.push_back(new CookTorranceMaterial(COOK, emission, matcol, fresnel, roughness));
+					_materialList.push_back(new CookTorranceMaterial(REFLECTION, emission, matcol, fresnel, roughness));
 				}
 				else if (str.compare("BlinMaterial") == 0)
 				{
@@ -348,7 +348,18 @@ namespace mini{
 					matcol = getNextVector(sstream);
 					fresnel = getNextNumber(sstream);
 					reflectionPower = getNextNumber(sstream);
-					_materialList.push_back(new BlinMaterial(BLIN, emission, matcol, fresnel, reflectionPower));
+					_materialList.push_back(new BlinMaterial(REFLECTION, emission, matcol, fresnel, reflectionPower));
+				}
+				else if (str.compare("GGXMaterial") == 0)
+				{
+					color emission, matcol;
+					float fresnel, roughness, reftIndex;
+					emission = getNextVector(sstream);
+					matcol = getNextVector(sstream);
+					fresnel = getNextNumber(sstream);
+					roughness = getNextNumber(sstream);
+					reftIndex = getNextNumber(sstream);
+					_materialList.push_back(new GGXMaterial(GGX, emission, matcol, fresnel, roughness, reftIndex));
 				}
 				else
 					break;
@@ -545,7 +556,7 @@ namespace mini{
 					return inter._material->getEmmision();
 				}
 
-			if (inter._type == DIFFUSE || inter._type == BLIN || inter._type == COOK) {		//积分漫反射材质
+			if (inter._type == DIFFUSE || inter._type == REFLECTION) {		//积分漫反射材质
 
 				ray._origin = inter._pos;
 				vector<float> z = inter._nor;
@@ -680,7 +691,31 @@ namespace mini{
 						//mask = mask / (1.f - pdf) * （1.f - fresnel);
 					}
 				}
-				else if (inter._type == BLIN || inter._type == COOK)
+				else if (inter._type == GGX)
+				{
+					hitSpeculer = true;			//暂时不进行直接光照计算，所以设为true
+
+					float brdf, btdf, pdfr, pdft, fresnel;
+					vector<float> rdir, tdir;
+					inter._material->Simple_BSDF(ray._direction, RandNumber(), RandNumber(), inter._nor, &pdfr, &brdf, &pdft, &btdf, &fresnel, &rdir, &tdir);
+
+					ray._origin = inter._pos;
+					float pdf = fresnel;
+					mask = mask * inter._material->getColor();
+					if (RandNumber() <= pdf)
+					{
+						ray._direction = Normalize(rdir);
+						mask = mask * brdf * Dot(rdir, inter._nor)/ pdfr;
+						//mask = mask / pdf * fresnel;			//除以是因为重要性采样，乘以是因为基于菲涅尔现象，刚好抵消
+					}
+					else
+					{
+						ray._direction = Normalize(tdir);
+						mask = mask * btdf * Dot(tdir, -inter._nor) / pdft;
+						//mask = mask / (1.f - pdf) * （1.f - fresnel);
+					}
+				}
+				else if (inter._type == REFLECTION)
 				{
 					hitSpeculer = false;
 
