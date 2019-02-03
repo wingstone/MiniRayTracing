@@ -996,23 +996,8 @@ namespace mini
 		{
 			normal nor =  Dot(ray._direction, _normal) > 0 ? -_normal :_normal;
 			float t = -(_d + Dot(_normal, ray._origin)) / Dot(_normal, ray._direction);
-			if (t < 0.f) 
+			if (t <= DELTA * 0.25f || inModel(ray._origin))
 				return Intersection::_empty;
-			else if (_material->_reftype == TRANSP || _material->_reftype == GGX)		//处理折射
-			{
-				if (!inModel(ray._origin))
-				{
-					point po = ray._origin + ray._direction*t;
-					vector<float> v1 = Normalize(_po1 - po);
-					vector<float> v2 = Normalize(_po2 - po);
-					vector<float> v3 = Normalize(_po3 - po);
-					vector<float> v4 = Normalize(_po4 - po);
-					if (acos(Dot(v1, v2)) + acos(Dot(v2, v3)) + acos(Dot(v3, v4)) + acos(Dot(v4, v1)) > 2 * PI - DELTA)			//根据夹角相加是否等于2PI来判断是否在多边形内部
-						return Intersection(ray._origin + ray._direction*t, nor, t - DELTA * 0.5f, _material->_reftype, _material, this);
-					else
-						return Intersection::_empty;
-				}
-			}
 			else
 			{
 				point po = ray._origin + ray._direction*t;
@@ -1050,7 +1035,7 @@ namespace mini
 		//在三角面的负法线方向上一侧
 		bool inModel(point po)
 		{
-			return Dot(_normal, _po1 - po) > 0;
+			return Dot(_normal, _po1 - po) > -DELTA;
 		}
 
 		Intersection getIntersection(Ray ray)
@@ -1069,7 +1054,7 @@ namespace mini
 			if (beta + gamma <= 1 && beta >= 0 && gamma >= 0)
 			{
 				normal nor = Dot(ray._direction, _normal) > 0 ? -_normal : _normal;
-				return t <= 0.f ? Intersection::_empty : Intersection(ray._origin + ray._direction*t, nor, t - DELTA*0.5f, _material->_reftype, _material, this);
+				return t <= DELTA * 0.25f ? Intersection::_empty : Intersection(ray._origin + ray._direction*t, nor, t - DELTA*0.5f, _material->_reftype, _material, this);
 			}
 			else
 			{
