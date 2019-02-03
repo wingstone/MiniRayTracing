@@ -21,7 +21,7 @@ Material{
 }
 Model{
 	Plane{	//0 wallFront
-		Center:0,0,-5; Normal:0,0,-1; Material: 3;
+		Center:0,0,-5; Normal:0,0,1; Material: 3;
 	}
 	Box{	//2 wallLeft
 		MinPosition:-5.25,-5.25,-5.25; MaxPosition:-5,5,5; Material: 1;
