@@ -306,15 +306,6 @@ namespace mini{
 
 					_materialList.push_back(new DiffuseMaterial(DIFFUSE, emmision, matCol));
 				}
-				else if (str.compare("OrenNayerMaterial") == 0)
-				{
-					color matCol, emmision;
-					emmision = getNextVector(sstream);
-					matCol = getNextVector(sstream);
-					float roughness = getNextNumber(sstream);
-
-					_materialList.push_back(new OrenNayerMaterial(DIFFUSE, emmision, matCol, roughness));
-				}
 				else if (str.compare("ReflectMaterial") == 0)
 				{
 					color matCol;
