@@ -19,31 +19,39 @@ namespace mini{
 	{
 	public:
 		Scene(int width, int height, int spp, int depth, color bgColor):_samplePerPixel(spp), _depth(depth),_bgColor(bgColor){
-			
+			_materialList = new std::vector<Material*>();
+			_modelList = new std::vector<Model*>();
+			_lightList = new std::vector<Model*>();
+			_camera = NULL;
 			_buffer = new UCHAR[width*height * 3];
+			_bmp = NULL;
+
 			_width = width; _height = height;
 		}
 		~Scene(){
-			for (auto i : _modelList)
+			for (auto i = _materialList->begin(); i < _materialList->end(); i++)
 			{
-				delete i;
+				delete *i;
 			}
-
-			for (auto i : _materialList)
+			for (auto i = _modelList->begin(); i < _modelList->end(); i++)
 			{
-				delete i;
+				delete *i;
 			}
-
-			delete[] _buffer;
+			delete _materialList;
+			delete _modelList;
+			delete _lightList;
+			if (_buffer != NULL) delete[] _buffer;
+			if (_bmp != NULL) delete _bmp;
 		}
 
 		//向场景添加模型，内存由Scene对象释放
 		void addModel(Model* model){
-			_modelList.push_back(model);
+			_modelList->push_back(model);
 		}
 
 		//设置相机
-		void setCamera(std::shared_ptr<Camera> camera){
+		void setCamera(Camera* camera){
+			delete _camera;
 			_camera = camera;
 		}
 
@@ -113,7 +121,7 @@ namespace mini{
 							po = getNextVector(filestream);
 							fron = getNextVector(filestream);
 							up = getNextVector(filestream);
-							_camera = std::make_shared<PerspectiveCamera>(fov, asp, po, fron, up );
+							_camera = new PerspectiveCamera(fov, asp, po, fron, up );
 						}
 						else if (str.compare("OrthoCamera") == 0)
 						{
@@ -122,7 +130,7 @@ namespace mini{
 							point origin = getNextVector(filestream);
 							vector<float> front = getNextVector(filestream);
 							vector<float> up = getNextVector(filestream);
-							_camera = std::make_shared<OrthoCamera>(height, aspect, origin, front, up);
+							_camera = new OrthoCamera(height, aspect, origin, front, up);
 						}
 						else if (str.compare("PinholeCamera") == 0)
 						{
@@ -134,14 +142,14 @@ namespace mini{
 							point origin = getNextVector(filestream);
 							vector<float> front = getNextVector(filestream);
 							vector<float> up = getNextVector(filestream);
-							_camera = std::make_shared<PinholeCamera>(apertureRedius, focusDistance, imageDistance, height, aspect, origin, front, up);
+							_camera = new PinholeCamera(apertureRedius, focusDistance, imageDistance, height, aspect, origin, front, up);
 						}
 						else if (str.compare("EnviromentCamera") == 0)
 						{
 							point origin = getNextVector(filestream);
 							vector<float> front = getNextVector(filestream);
 							vector<float> up = getNextVector(filestream);
-							_camera = std::make_shared<EnviromentCamera>(origin, front, up);
+							_camera = new EnviromentCamera(origin, front, up);
 						}
 					}
 					else if (str.compare("Light") == 0)
@@ -174,7 +182,8 @@ namespace mini{
 		//绘制和写入文件RayTrace.bmp
 		void renderAndWrite(const char* filename)
 		{
-			_bmp = std::make_shared<BmpClass>(filename);
+			if (_bmp != NULL) delete _bmp;
+			_bmp = new BmpClass(filename);
 			float spp_1 = float(1)/_samplePerPixel;
 			int sum = 0;
 			std::cout << "\nRendering prograss: ";
@@ -201,12 +210,12 @@ namespace mini{
 		}
 
 	private:
-		std::vector<Material*> _materialList;
-		std::vector<Model*>  _modelList;
-		std::vector<Model*> _lightList;		//光源同时存在于模型列表与光源列表中
-		std::shared_ptr<Camera> _camera;
+		std::vector<Material*>* _materialList;
+		std::vector<Model*>*  _modelList;
+		std::vector<Model*>* _lightList;		//光源同时存在于模型列表与光源列表中
+		Camera* _camera;
 		UCHAR* _buffer;
-		std::shared_ptr<BmpClass> _bmp;
+		BmpClass* _bmp;
 
 		color _bgColor;
 		int _width;
@@ -304,13 +313,13 @@ namespace mini{
 					emmision = getNextVector(sstream);
 					matCol = getNextVector(sstream);
 
-					_materialList.push_back(new DiffuseMaterial(DIFFUSE, emmision, matCol));
+					_materialList->push_back(new DiffuseMaterial(DIFFUSE, emmision, matCol));
 				}
 				else if (str.compare("ReflectMaterial") == 0)
 				{
 					color matCol;
 					matCol = getNextVector(sstream);
-					_materialList.push_back(new MirrorMaterial(MIRROR, matCol));
+					_materialList->push_back(new MirrorMaterial(MIRROR, matCol));
 				}
 				else if (str.compare("TranspMaterial") == 0)
 				{
@@ -319,7 +328,7 @@ namespace mini{
 					fresnel = getNextNumber(sstream);
 					reftIndex = getNextNumber(sstream);
 					matCol = getNextVector(sstream);
-					_materialList.push_back(new TramsparentMaterial(TRANSP, fresnel, reftIndex, matCol));
+					_materialList->push_back(new TramsparentMaterial(TRANSP, fresnel, reftIndex, matCol));
 				}
 				else if (str.compare("CookMaterial") == 0)
 				{
@@ -329,7 +338,7 @@ namespace mini{
 					matcol = getNextVector(sstream);
 					fresnel = getNextNumber(sstream);
 					roughness = getNextNumber(sstream);
-					_materialList.push_back(new CookTorranceMaterial(COOK, emission, matcol, fresnel, roughness));
+					_materialList->push_back(new CookTorranceMaterial(COOK, emission, matcol, fresnel, roughness));
 				}
 				else if (str.compare("BlinMaterial") == 0)
 				{
@@ -339,7 +348,7 @@ namespace mini{
 					matcol = getNextVector(sstream);
 					fresnel = getNextNumber(sstream);
 					reflectionPower = getNextNumber(sstream);
-					_materialList.push_back(new BlinMaterial(BLIN, emission, matcol, fresnel, reflectionPower));
+					_materialList->push_back(new BlinMaterial(BLIN, emission, matcol, fresnel, reflectionPower));
 				}
 				else
 					break;
@@ -361,7 +370,7 @@ namespace mini{
 					center = getNextVector(sstream);
 					redius = getNextNumber(sstream);
 					matId = (int)getNextNumber(sstream);
-					_modelList.push_back(new Sphere(center, redius, _materialList[matId]));
+					_modelList->push_back(new Sphere(center, redius, _materialList->at(matId)));
 				}
 				else if (str.compare("Box") == 0)
 				{
@@ -371,7 +380,7 @@ namespace mini{
 					minPo = getNextVector(sstream);
 					maxPo = getNextVector(sstream);
 					matId = (int)getNextNumber(sstream);
-					_modelList.push_back(new Box(minPo, maxPo, _materialList[matId]));
+					_modelList->push_back(new Box(minPo, maxPo, _materialList->at(matId)));
 				}
 				else if (str.compare("Plane") == 0)
 				{
@@ -381,7 +390,7 @@ namespace mini{
 					center = getNextVector(sstream);
 					nor = getNextVector(sstream);
 					matId = (int)getNextNumber(sstream);
-					_modelList.push_back(new Plane(center, nor, _materialList[matId]));
+					_modelList->push_back(new Plane(center, nor, _materialList->at(matId)));
 				}
 				else if (str.compare("Triangle") == 0)
 				{
@@ -393,7 +402,7 @@ namespace mini{
 					po2 = getNextVector(sstream);
 					po3 = getNextVector(sstream);
 					matId = (int)getNextNumber(sstream);
-					_modelList.push_back(new Triangle(po1, po2, po3, _materialList[matId]));
+					_modelList->push_back(new Triangle(po1, po2, po3, _materialList->at(matId)));
 				}
 				else if (str.compare("Polygon") == 0)
 				{
@@ -407,7 +416,7 @@ namespace mini{
 					po3 = getNextVector(sstream);
 					po4 = getNextVector(sstream);
 					matId = (int)getNextNumber(sstream);
-					_modelList.push_back(new Polygon(po1, po2, po3, po4, _materialList[matId]));
+					_modelList->push_back(new Polygon(po1, po2, po3, po4, _materialList->at(matId)));
 				}
 				else
 				{
@@ -432,9 +441,9 @@ namespace mini{
 					redius = getNextNumber(sstream);
 					nor = getNextVector(sstream);
 					matId = (int)getNextNumber(sstream);
-					Disk_Light* disklight = new Disk_Light(center, redius, nor, true, _materialList[matId]);
-					_lightList.push_back(disklight);
-					_modelList.push_back(disklight);
+					Disk_Light* disklight = new Disk_Light(center, redius, nor, true, _materialList->at(matId));
+					_lightList->push_back(disklight);
+					_modelList->push_back(disklight);
 				}
 				else if (str.compare("Sphere_Light") == 0)
 				{
@@ -444,9 +453,9 @@ namespace mini{
 					center = getNextVector(sstream);
 					redius = getNextNumber(sstream);
 					matId = (int)getNextNumber(sstream);
-					Sphere_Light* sphLight = new Sphere_Light(center, redius, true, _materialList[matId]);
-					_lightList.push_back(sphLight);
-					_modelList.push_back(sphLight);
+					Sphere_Light* sphLight = new Sphere_Light(center, redius, true, _materialList->at(matId));
+					_lightList->push_back(sphLight);
+					_modelList->push_back(sphLight);
 				}
 				else
 				{
@@ -476,6 +485,9 @@ namespace mini{
 							r2 = (s2 + RandNumber())/ float(sqrt_spp);
 							float screenX = ( (s1 + r1) / float(sqrt_spp) + i + x*sub_wid) / _width;
 							float screenY = ( (s1 + r2) / float(sqrt_spp) + j + y*sub_hei) / _height;
+
+							if (screenX > 0.3f && screenY > 0.5f)
+								float p = 0.f;
 
 							Ray ray = _camera->getRay(screenX, screenY, r1, r2);
 							col = col + rayTrace(ray, _depth);
@@ -599,7 +611,7 @@ namespace mini{
 			{
 				//select closet model;
 				Intersection inter = Intersection::_empty;
-				for (auto i = _modelList.begin(); i != _modelList.end(); i++) {
+				for (auto i = _modelList->begin(); i != _modelList->end(); i++) {
 
 					Intersection tempInter = (*i)->getIntersection(ray);
 					if (inter._type != EMPTY && tempInter._type != EMPTY&& tempInter._t < inter._t) {
@@ -678,7 +690,7 @@ namespace mini{
 					//direct lighting
 					if (!inter._model->IsLight())
 					{
-						size_t light_samples = _lightList.size();		//全光源采样
+						size_t light_samples = _lightList->size();		//全光源采样
 						color directColor;
 						for (size_t i = 0; i < light_samples; i++)
 						{
@@ -690,14 +702,14 @@ namespace mini{
 							color lightCol;
 
 							//MIS: light sampling
-							lightCol = _lightList[i]->Sample_L(RandNumber(), RandNumber(), inter._pos, &lightDir, &light_pdf);
+							lightCol = _lightList->at(i)->Sample_L(RandNumber(), RandNumber(), inter._pos, &lightDir, &light_pdf);
 							lightDir = Normalize(lightDir);
 							if (light_pdf < 0.f) continue;
 
 							//test visibility
 							Intersection shadowInter = Intersection::_empty;
 							Ray  shadowRay(inter._pos, lightDir);
-							for (auto i = _modelList.begin(); i != _modelList.end(); i++) {
+							for (auto i = _modelList->begin(); i != _modelList->end(); i++) {
 								Intersection tempInter = (*i)->getIntersection(shadowRay);
 								if (shadowInter._type != EMPTY && tempInter._type != EMPTY && tempInter._t < shadowInter._t) {
 									shadowInter = tempInter;
@@ -706,7 +718,7 @@ namespace mini{
 									shadowInter = tempInter;
 								}
 							}
-							if (shadowInter._model == _lightList[i])
+							if (shadowInter._model == _lightList->at(i))
 							{
 								vector<float> nor = inter._nor;
 								vector<float> inDir = ray._direction;
@@ -727,7 +739,7 @@ namespace mini{
 							//test visibility
 							shadowInter = Intersection::_empty;
 							shadowRay._direction = lightDir;
-							for (auto i = _modelList.begin(); i != _modelList.end(); i++) {
+							for (auto i = _modelList->begin(); i != _modelList->end(); i++) {
 
 								Intersection tempInter = (*i)->getIntersection(shadowRay);
 								if (shadowInter._type != EMPTY && tempInter._type != EMPTY && tempInter._t < shadowInter._t) {
@@ -737,9 +749,9 @@ namespace mini{
 									shadowInter = tempInter;
 								}
 							}
-							if (shadowInter._model == _lightList[i])
+							if (shadowInter._model == _lightList->at(i))
 							{
-								light_pdf = _lightList[i]->CalculatePdf(inter._pos, inter._t, lightDir);
+								light_pdf = _lightList->at(i)->CalculatePdf(inter._pos, inter._t, lightDir);
 								weight = brdf_pdf * brdf_pdf / (light_pdf*light_pdf + brdf_pdf * brdf_pdf);
 								directColor = directColor + mask * weight * lightCol * inter._material->getColor()* Dot(lightDir, inter._nor) * brdf / brdf_pdf;
 							}
@@ -766,20 +778,20 @@ namespace mini{
 					//direct lighting
 					if (!inter._model->IsLight())
 					{
-						size_t light_samples = _lightList.size();		//全光源采样
+						size_t light_samples = _lightList->size();		//全光源采样
 						color directColor;
 						for (size_t i = 0; i < light_samples; i++)
 						{
 							vector<float> lightDir;
 							float pdf;
-							color lightCol = _lightList[i]->Sample_L(RandNumber(), RandNumber(), inter._pos, &lightDir, &pdf);
+							color lightCol = _lightList->at(i)->Sample_L(RandNumber(), RandNumber(), inter._pos, &lightDir, &pdf);
 							lightDir = Normalize(lightDir);
 							if (pdf < 0.f) continue;
 
 							//test visibility
 							Intersection shadowInter = Intersection::_empty;
 							Ray  shadowRay(inter._pos, lightDir);
-							for (auto i = _modelList.begin(); i != _modelList.end(); i++) {
+							for (auto i = _modelList->begin(); i != _modelList->end(); i++) {
 
 								Intersection tempInter = (*i)->getIntersection(shadowRay);
 								if (shadowInter._type != EMPTY && tempInter._type != EMPTY && tempInter._t < shadowInter._t) {
@@ -789,7 +801,7 @@ namespace mini{
 									shadowInter = tempInter;
 								}
 							}
-							if (shadowInter._model != _lightList[i])
+							if (shadowInter._model != _lightList->at(i))
 								continue;
 
 							vector<float> nor = inter._nor;
