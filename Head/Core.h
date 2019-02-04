@@ -994,10 +994,27 @@ namespace mini
 
 		Intersection getIntersection(Ray ray)
 		{
-			normal nor =  Dot(ray._direction, _normal) > 0 ? -_normal :_normal;
+			normal nor =  _normal;
 			float t = -(_d + Dot(_normal, ray._origin)) / Dot(_normal, ray._direction);
-			if (t <= DELTA * 0.25f || inModel(ray._origin))
+			if (t <= DELTA * 0.25f)
 				return Intersection::_empty;
+			else if (_material->_reftype == GGX || _material->_reftype == TRANSP)
+			{
+				if (inModel(ray._origin))
+					return Intersection::_empty;
+				else
+				{
+					point po = ray._origin + ray._direction*t;
+					vector<float> v1 = Normalize(_po1 - po);
+					vector<float> v2 = Normalize(_po2 - po);
+					vector<float> v3 = Normalize(_po3 - po);
+					vector<float> v4 = Normalize(_po4 - po);
+					if (acos(Dot(v1, v2)) + acos(Dot(v2, v3)) + acos(Dot(v3, v4)) + acos(Dot(v4, v1)) > 2 * PI - DELTA)			//根据夹角相加是否等于2PI来判断是否在多边形内部
+						return Intersection(ray._origin + ray._direction*t, nor, t - DELTA * 0.5f, _material->_reftype, _material, this);
+					else
+						return Intersection::_empty;
+				}
+			}
 			else
 			{
 				point po = ray._origin + ray._direction*t;
